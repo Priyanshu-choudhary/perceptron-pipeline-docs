@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stage 9: 3D-Aware Dynamic Costmap — Project Perceptron Pipeline</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../css/pipeline.css">
+</head>
+<body class="min-h-screen flex flex-col bg-[#060913] text-slate-100 selection:bg-cyan-500 selection:text-black">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="../index.html" class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-black text-black text-sm hover:opacity-90">
+        P
+      </a>
+      <div class="flex items-center gap-2 text-xs font-mono">
+        <a href="../index.html" class="text-slate-400 hover:text-white">Pipeline Overview</a>
+        <span class="text-slate-600">/</span>
+        <span class="text-cyan-400 font-bold">Stage 9: 3D-Aware Dynamic Costmap</span>
+      </div>
+    </div>
+    
+    <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/tree/feature/carla-sim-perception" 
+       target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-cyan-400 hover:underline">
+      Branch: feature/carla-sim-perception ↗
+    </a>
+  </header>
+
+  <!-- Content Container -->
+  <main class="max-w-5xl mx-auto px-6 py-10 w-full flex-1">
+    
+    <!-- Stage Title Badge -->
+    <div class="mb-6">
+      <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
+            style="background: #14b8a620; color: #14b8a6; border: 1px solid #14b8a660">
+        Stage 09 • Spatial Risk Modeling
+      </span>
+      <h1 class="text-3xl md:text-5xl font-black text-white mt-3 mb-4">
+        3D-Aware Dynamic Costmap
+      </h1>
+      <p class="text-base text-slate-300 leading-relaxed">
+        Synthesizes a rolling 3-layer 2D/3D costmap in odom frame: Layer 1 Voxel Height Obstacles, Layer 2 Inscribed Inflation, and Layer 3 Dynamic Spatio-Temporal Risk Ribbons.
+      </p>
+    </div>
+
+    <!-- Sub-Steps Section -->
+    <section class="my-10">
+      <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full" style="background: #14b8a6"></span>
+        Detailed Sequential Sub-Steps
+      </h2>
+      <div class="space-y-4">
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 9.1</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Layer 1: 3D Voxel Height Obstacle Slicing</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Discretizes obstacle points into 5cm height voxels above ground; projects occupied voxels between 0.1m and 1.6m onto 2D occupancy grid.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 9.2</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Layer 2: Inscribed & Exponential Cost Inflation</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Buffers lethal obstacles with inscribed rover radius (r=0.33m / 0.75m), decaying outwards via exponential cost scaling: cost = 100 * exp(-s * (dist - r_inscribed)).</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 9.3</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Layer 3: Spatio-Temporal Dynamic Risk Ribbons</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Rasterizes predicted vehicle/pedestrian paths with Gaussian lateral clearance, weighted inversely by time-to-encounter (decaying from 100 at 0s to 30 at 2s).</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 9.4</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Layer 4: Cell Fusion & Maximum Pooling</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Combines Layer 2 and Layer 3 via max-pooling: combined_cost(x, y) = max(inflated_cost(x, y), dynamic_risk_cost(x, y)).</p>
+          </div>
+        
+      </div>
+    </section>
+
+    <!-- Nodes & ROS Topics Section -->
+    <section class="my-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Node Implementations -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          Executable Nodes & Modules
+        </h3>
+        <div class="space-y-4">
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">costmap_node</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Costmap Generator</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Maintains rolling costmaps centered on ego vehicle; incorporates moving obstacle predictions directly into Nav2 cost.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_perception/perceptron_perception/costmap_node.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_perception/perceptron_perception/costmap_node.py</span> ↗
+                </a>
+              
+            </div>
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">costmap.py</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Rasterization Engine</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Accelerated NumPy array voxel projection, Euclidean distance transform, and ribbon stamping.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_perception/perceptron_perception/costmap.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_perception/perceptron_perception/costmap.py</span> ↗
+                </a>
+              
+            </div>
+          
+        </div>
+      </div>
+
+      <!-- Published Outputs -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          Published Output Topics
+        </h3>
+        <div class="space-y-3 font-mono text-xs">
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/costmap/combined</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">nav_msgs/msg/OccupancyGrid (0-100 cost)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Nav2 Local Costmap</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/costmap/dynamic_risk</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">nav_msgs/msg/OccupancyGrid</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: RViz & Debug</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/costmap/voxels</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/PointCloud2</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: 3D RViz Visualization</div>
+            </div>
+          
+        </div>
+      </div>
+    </section>
+
+    <!-- Code Snippet -->
+    <section class="my-10">
+      <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+        Core Algorithmic Implementation
+      </h3>
+      <pre class="code-container p-5"><code># costmap.py: Dynamic Risk Ribbon Stamping
+# Predicted paths are stamped as lethal ribbons along the path, with risk falling
+# with time-to-encounter so immediate collisions are lethal while 2s paths allow navigation
+risk_weight = np.clip(1.0 - (t_encounter / max_horizon), 0.3, 1.0)
+cost_cell = int(90 * risk_weight * np.exp(-0.5 * (d_lateral / sigma)**2))
+combined_grid = np.maximum(inflated_grid, dynamic_risk_grid)</code></pre>
+    </section>
+
+    <!-- Bottom Navigation -->
+    <div class="mt-12 pt-6 border-t border-slate-800 flex items-center justify-between">
+      <a href="stage-08-prediction.html" class="text-xs font-mono text-cyan-400 hover:underline">← Stage 08: Trajectory Prediction</a>
+      <a href="../index.html" class="text-xs font-mono text-slate-400 hover:text-white">← Main Pipeline Track</a>
+      <a href="stage-10-nav2.html" class="text-xs font-mono text-cyan-400 hover:underline">Stage 10: Nav2 Planning & Motion Control →</a>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-6 text-center text-xs font-mono text-slate-500">
+    Project Perceptron Autonomous Navigation & Perception Documentation
+  </footer>
+
+</body>
+</html>

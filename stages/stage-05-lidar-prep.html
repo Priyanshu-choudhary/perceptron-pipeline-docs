@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stage 5: 3D LiDAR Preprocessing — Project Perceptron Pipeline</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../css/pipeline.css">
+</head>
+<body class="min-h-screen flex flex-col bg-[#060913] text-slate-100 selection:bg-cyan-500 selection:text-black">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="../index.html" class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-black text-black text-sm hover:opacity-90">
+        P
+      </a>
+      <div class="flex items-center gap-2 text-xs font-mono">
+        <a href="../index.html" class="text-slate-400 hover:text-white">Pipeline Overview</a>
+        <span class="text-slate-600">/</span>
+        <span class="text-cyan-400 font-bold">Stage 5: 3D LiDAR Preprocessing</span>
+      </div>
+    </div>
+    
+    <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/tree/feature/carla-sim-perception" 
+       target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-cyan-400 hover:underline">
+      Branch: feature/carla-sim-perception ↗
+    </a>
+  </header>
+
+  <!-- Content Container -->
+  <main class="max-w-5xl mx-auto px-6 py-10 w-full flex-1">
+    
+    <!-- Stage Title Badge -->
+    <div class="mb-6">
+      <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
+            style="background: #8b5cf620; color: #8b5cf6; border: 1px solid #8b5cf660">
+        Stage 05 • Geometry & Filtering
+      </span>
+      <h1 class="text-3xl md:text-5xl font-black text-white mt-3 mb-4">
+        3D LiDAR Preprocessing
+      </h1>
+      <p class="text-base text-slate-300 leading-relaxed">
+        Filters raw PointCloud2 in base_footprint, separates road surface via RANSAC plane + local elevation grid, clusters obstacle points into bounding boxes, and projects 2D LaserScan.
+      </p>
+    </div>
+
+    <!-- Sub-Steps Section -->
+    <section class="my-10">
+      <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full" style="background: #8b5cf6"></span>
+        Detailed Sequential Sub-Steps
+      </h2>
+      <div class="space-y-4">
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 5.1</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">base_footprint</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Range & Ego Self-Box Culling</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Discards points < 0.5m (sensor housing) and > 50.0m; crops robot chassis box [-0.45, 2.0, -0.9, 0.9, -0.3, 1.55] in base_footprint.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 5.2</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">base_footprint</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Dual RANSAC Plane + Height Grid Ground Removal</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">RANSAC fits road plane (tilt near 0°, z near 0). Points within cell_height of lowest grid point are ground; prevents curbs becoming walls.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 5.3</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">base_footprint</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">2D Projected Obstacle Clustering</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Projects non-ground obstacle points into 2D (x, y) to collapse vertical LiDAR rings, then clusters via KD-tree graph components.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 5.4</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">base_footprint</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Radial LaserScan Flattening</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Finds minimum range per bearing bin across vertical field of view to create synthetic 2D LaserScan for AMCL and 2D costmaps.</p>
+          </div>
+        
+      </div>
+    </section>
+
+    <!-- Nodes & ROS Topics Section -->
+    <section class="my-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Node Implementations -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          Executable Nodes & Modules
+        </h3>
+        <div class="space-y-4">
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">lidar_preprocessor_node</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Perception Core Node</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Performs real-time spatial decomposition of 3D point clouds in base_footprint frame.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_perception/perceptron_perception/lidar_preprocessor_node.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_perception/perceptron_perception/lidar_preprocessor_node.py</span> ↗
+                </a>
+              
+            </div>
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">cloud_processing.py</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Pure Math Library</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Contains standalone NumPy/SciPy KD-tree, RANSAC, and sparse connected component algorithms.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_perception/perceptron_perception/cloud_processing.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_perception/perceptron_perception/cloud_processing.py</span> ↗
+                </a>
+              
+            </div>
+          
+        </div>
+      </div>
+
+      <!-- Published Outputs -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          Published Output Topics
+        </h3>
+        <div class="space-y-3 font-mono text-xs">
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/perception/points_ground</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/PointCloud2</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Costmap Node</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/perception/points_obstacles</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/PointCloud2 (x,y,z,cluster)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Object Fusion & Costmap</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/perception/clusters</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">vision_msgs/msg/Detection3DArray</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Evaluation</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/perception/scan</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/LaserScan</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: AMCL / Nav2</div>
+            </div>
+          
+        </div>
+      </div>
+    </section>
+
+    <!-- Code Snippet -->
+    <section class="my-10">
+      <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+        Core Algorithmic Implementation
+      </h3>
+      <pre class="code-container p-5"><code># cloud_processing.py: Why Ground uses Plane + Height Grid
+# A single RANSAC plane finds the road, but a raised sidewalk sits 10-20 cm above it
+# and would come out as one enormous obstacle.
+# Point is ground if:
+# 1) Within plane_threshold of fitted plane, OR
+# 2) Within cell_height of lowest point in its cell AND lowest point is within cell_plane_tol
+def ground_mask(xyz, plane, cell_size=0.5, cell_height=0.08, plane_thresh=0.06):
+    d_plane = np.abs(np.dot(xyz, plane[:3]) + plane[3])
+    # ... cell spatial hash lookup ...
+    return is_ground</code></pre>
+    </section>
+
+    <!-- Bottom Navigation -->
+    <div class="mt-12 pt-6 border-t border-slate-800 flex items-center justify-between">
+      <a href="stage-04-slam.html" class="text-xs font-mono text-cyan-400 hover:underline">← Stage 04: Global Map Localization</a>
+      <a href="../index.html" class="text-xs font-mono text-slate-400 hover:text-white">← Main Pipeline Track</a>
+      <a href="stage-06-fusion.html" class="text-xs font-mono text-cyan-400 hover:underline">Stage 06: Camera-LiDAR Sensor Fusion →</a>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-6 text-center text-xs font-mono text-slate-500">
+    Project Perceptron Autonomous Navigation & Perception Documentation
+  </footer>
+
+</body>
+</html>

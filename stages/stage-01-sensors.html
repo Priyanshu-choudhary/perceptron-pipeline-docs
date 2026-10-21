@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stage 1: Sensors & Sources — Project Perceptron Pipeline</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../css/pipeline.css">
+</head>
+<body class="min-h-screen flex flex-col bg-[#060913] text-slate-100 selection:bg-cyan-500 selection:text-black">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="../index.html" class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-black text-black text-sm hover:opacity-90">
+        P
+      </a>
+      <div class="flex items-center gap-2 text-xs font-mono">
+        <a href="../index.html" class="text-slate-400 hover:text-white">Pipeline Overview</a>
+        <span class="text-slate-600">/</span>
+        <span class="text-cyan-400 font-bold">Stage 1: Sensors & Sources</span>
+      </div>
+    </div>
+    
+    <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/tree/feature/carla-sim-perception" 
+       target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-cyan-400 hover:underline">
+      Branch: feature/carla-sim-perception ↗
+    </a>
+  </header>
+
+  <!-- Content Container -->
+  <main class="max-w-5xl mx-auto px-6 py-10 w-full flex-1">
+    
+    <!-- Stage Title Badge -->
+    <div class="mb-6">
+      <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
+            style="background: #00e5ff20; color: #00e5ff; border: 1px solid #00e5ff60">
+        Stage 01 • Hardware & Sim Input
+      </span>
+      <h1 class="text-3xl md:text-5xl font-black text-white mt-3 mb-4">
+        Sensors & Sources
+      </h1>
+      <p class="text-base text-slate-300 leading-relaxed">
+        Physical rover transducers and CARLA UE4 Town10 synthetic equivalents capturing environmental geometry, inertial dynamics, wheel ticks, and imagery.
+      </p>
+    </div>
+
+    <!-- Sub-Steps Section -->
+    <section class="my-10">
+      <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full" style="background: #00e5ff"></span>
+        Detailed Sequential Sub-Steps
+      </h2>
+      <div class="space-y-4">
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 1.1</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">lidar3d_link</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">3D LiDAR Spatial Scanning</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Velodyne VLP-16 (16-beam, 30 kHz point rate, 10 Hz rotation, 100 m range, 15° downward pitch) or RPLiDAR D500 2D scanner emitting range/azimuth rays.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 1.2</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">50-100 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">imu_link</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Inertial Measurement (IMU)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Pixhack 2.8.4 internal MPU-6000 6-axis gyroscope and accelerometer capturing body rates (rad/s) and specific forces (+9.81 m/s² z at rest).</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 1.3</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">20-50 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">base_link</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Wheel Quadrature Encoders</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">High-resolution quadrature optical encoders on 4 high-torque geared DC motor shafts measuring rotational pulses per millisecond.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 1.4</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">5 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">gps_link</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Global Navigation Satellite (GNSS)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">U-blox NEO-M8N GPS module measuring WGS84 Geodetic latitude, longitude, and ellipsoidal altitude with covariance estimates.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 1.5</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">15-30 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">camera_optical_link</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Monocular Vision Stream</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Sony IMX219 / Wide-Angle camera capturing 1280x720 RGB frames with calibrated intrinsic matrix K and distortion coefficients D.</p>
+          </div>
+        
+      </div>
+    </section>
+
+    <!-- Nodes & ROS Topics Section -->
+    <section class="my-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Node Implementations -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          Executable Nodes & Modules
+        </h3>
+        <div class="space-y-4">
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">Physical Hardware Rig</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Physical Transducer</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Physical robot instrumentation mounted on vibration-isolated mast.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_robot_description/urdf/perceptron_robot.xacro" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_robot_description/urdf/perceptron_robot.xacro</span> ↗
+                </a>
+              
+            </div>
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">CARLA Simulated Sensors</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Simulation Actor</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">CARLA 0.9.15 Unreal Engine 4 sensor actors with synthetic noise injectors (WheelOdometry, ImuOrientation, Gnss).</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_carla/perceptron_carla/sim_sensors.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_carla/perceptron_carla/sim_sensors.py</span> ↗
+                </a>
+              
+            </div>
+          
+        </div>
+      </div>
+
+      <!-- Published Outputs -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          Published Output Topics
+        </h3>
+        <div class="space-y-3 font-mono text-xs">
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/points (or /carla/lidar/points)</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/PointCloud2</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: LiDAR Preprocessor</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/imu/data_raw</span>
+                <span class="text-[10px] text-slate-400">50 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/Imu</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Gyro Conditioner & EKF</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/gps/fix</span>
+                <span class="text-[10px] text-slate-400">5 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/NavSatFix</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: NavSat Transform</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/camera/image_raw</span>
+                <span class="text-[10px] text-slate-400">15-30 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/Image (1280x720 BGR8)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Jetson Pipeline / 2D Detector</div>
+            </div>
+          
+        </div>
+      </div>
+    </section>
+
+    <!-- Code Snippet -->
+    <section class="my-10">
+      <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+        Core Algorithmic Implementation
+      </h3>
+      <pre class="code-container p-5"><code># sim_sensors.py: Realistic IMU attitude random walk + gyro bias
+class ImuOrientation:
+    def __init__(self, rng, dt, yaw_bias=math.radians(2.0), 
+                 yaw_walk_std=math.radians(0.05), yaw_noise_std=math.radians(0.5)):
+        self.yaw_offset = yaw_bias
+        self.walk_step = yaw_walk_std * math.sqrt(dt)
+        self.yaw_std = yaw_noise_std
+        
+    def measure(self, roll, pitch, yaw):
+        self.yaw_offset += self.rng.normal(0.0, self.walk_step)
+        return (roll + self.rng.normal(0.0, 0.005),
+                pitch + self.rng.normal(0.0, 0.005),
+                wrap_angle(yaw + self.yaw_offset + self.rng.normal(0.0, self.yaw_std)))</code></pre>
+    </section>
+
+    <!-- Bottom Navigation -->
+    <div class="mt-12 pt-6 border-t border-slate-800 flex items-center justify-between">
+      <div></div>
+      <a href="../index.html" class="text-xs font-mono text-slate-400 hover:text-white">← Main Pipeline Track</a>
+      <a href="stage-02-bridges.html" class="text-xs font-mono text-cyan-400 hover:underline">Stage 02: Hardware & Sim Bridges →</a>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-6 text-center text-xs font-mono text-slate-500">
+    Project Perceptron Autonomous Navigation & Perception Documentation
+  </footer>
+
+</body>
+</html>

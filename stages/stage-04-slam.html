@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stage 4: Global Map Localization — Project Perceptron Pipeline</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../css/pipeline.css">
+</head>
+<body class="min-h-screen flex flex-col bg-[#060913] text-slate-100 selection:bg-cyan-500 selection:text-black">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="../index.html" class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-black text-black text-sm hover:opacity-90">
+        P
+      </a>
+      <div class="flex items-center gap-2 text-xs font-mono">
+        <a href="../index.html" class="text-slate-400 hover:text-white">Pipeline Overview</a>
+        <span class="text-slate-600">/</span>
+        <span class="text-cyan-400 font-bold">Stage 4: Global Map Localization</span>
+      </div>
+    </div>
+    
+    <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/tree/feature/carla-sim-perception" 
+       target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-cyan-400 hover:underline">
+      Branch: feature/carla-sim-perception ↗
+    </a>
+  </header>
+
+  <!-- Content Container -->
+  <main class="max-w-5xl mx-auto px-6 py-10 w-full flex-1">
+    
+    <!-- Stage Title Badge -->
+    <div class="mb-6">
+      <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
+            style="background: #6366f120; color: #6366f1; border: 1px solid #6366f160">
+        Stage 04 • World Referencing
+      </span>
+      <h1 class="text-3xl md:text-5xl font-black text-white mt-3 mb-4">
+        Global Map Localization
+      </h1>
+      <p class="text-base text-slate-300 leading-relaxed">
+        Resolves global pose against an environment map. Exactly one node owns the map -> odom transform: slam_toolbox during mapping, or AMCL seeded by ArUco markers during localization.
+      </p>
+    </div>
+
+    <!-- Sub-Steps Section -->
+    <section class="my-10">
+      <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full" style="background: #6366f1"></span>
+        Detailed Sequential Sub-Steps
+      </h2>
+      <div class="space-y-4">
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 4.1</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">On Detection</strong></span>
+                <span>Frame: <strong class="text-cyan-400">map</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">ArUco PnP Global Pose Seeding</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">aruco_localizer_node detects wall-mounted ArUco fiduciary boards via OpenCV solvePnP, computes T_map_base, and publishes /initialpose when robot is stationary.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 4.2</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10-20 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">map -> odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Particle Filter Update (AMCL)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">KLD-sampling Adaptive Monte Carlo Localization evaluates 240 laser beams against static likelihood field, publishing map -> odom correction.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 4.3</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">5 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">map -> odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Pose Graph SLAM (Alternative)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">async_slam_toolbox_node runs scan-matcher frontend and Ceres nonlinear optimizer backend to build rolling occupancy grid /map.</p>
+          </div>
+        
+      </div>
+    </section>
+
+    <!-- Nodes & ROS Topics Section -->
+    <section class="my-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Node Implementations -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          Executable Nodes & Modules
+        </h3>
+        <div class="space-y-4">
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">amcl</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">nav2_amcl Node</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Estimates global 2D pose against pre-built map; updates particle weights only after translation > 0.1m or rotation > 0.1rad.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_navigation/config/nav2_params.yaml" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_navigation/config/nav2_params.yaml</span> ↗
+                </a>
+              
+            </div>
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">aruco_localizer_node</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Vision Localizer Node</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Solves cold-start problem by generating high-confidence initial pose from environmental fiducials.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_navigation/perceptron_navigation/aruco_localizer_node.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_navigation/perceptron_navigation/aruco_localizer_node.py</span> ↗
+                </a>
+              
+            </div>
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">async_slam_toolbox_node</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">SLAM Mapping Node</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Performs lifelong SLAM and loop-closure optimization in uncharted regions.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_navigation/config/slam_toolbox.yaml" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_navigation/config/slam_toolbox.yaml</span> ↗
+                </a>
+              
+            </div>
+          
+        </div>
+      </div>
+
+      <!-- Published Outputs -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          Published Output Topics
+        </h3>
+        <div class="space-y-3 font-mono text-xs">
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>TF: map -> odom</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">geometry_msgs/msg/TransformStamped</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: TF Tree</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/map</span>
+                <span class="text-[10px] text-slate-400">Latched</span>
+              </div>
+              <div class="text-[11px] text-slate-400">nav_msgs/msg/OccupancyGrid</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Nav2 Global Planner</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/particle_cloud</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">nav_msgs/msg/ParticleCloud</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: RViz</div>
+            </div>
+          
+        </div>
+      </div>
+    </section>
+
+    <!-- Code Snippet -->
+    <section class="my-10">
+      <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+        Core Algorithmic Implementation
+      </h3>
+      <pre class="code-container p-5"><code># aruco_localizer_node.py: Seeding AMCL safely without competing for TF ownership
+# AMCL owns map -> odom. This node only provides /initialpose then gets out of the way.
+pose_msg = PoseWithCovarianceStamped()
+pose_msg.header.stamp = self.get_clock().now().to_msg()
+pose_msg.header.frame_id = "map"
+pose_msg.pose.pose = t_map_base
+pose_msg.pose.covariance[0] = 0.05   # x variance: 5 cm
+pose_msg.pose.covariance[7] = 0.05   # y variance: 5 cm
+pose_msg.pose.covariance[35] = 0.02  # yaw variance: ~8 deg
+self.initial_pose_pub.publish(pose_msg)</code></pre>
+    </section>
+
+    <!-- Bottom Navigation -->
+    <div class="mt-12 pt-6 border-t border-slate-800 flex items-center justify-between">
+      <a href="stage-03-ekf.html" class="text-xs font-mono text-cyan-400 hover:underline">← Stage 03: Local Odometry Fusion (EKF)</a>
+      <a href="../index.html" class="text-xs font-mono text-slate-400 hover:text-white">← Main Pipeline Track</a>
+      <a href="stage-05-lidar-prep.html" class="text-xs font-mono text-cyan-400 hover:underline">Stage 05: 3D LiDAR Preprocessing →</a>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-6 text-center text-xs font-mono text-slate-500">
+    Project Perceptron Autonomous Navigation & Perception Documentation
+  </footer>
+
+</body>
+</html>

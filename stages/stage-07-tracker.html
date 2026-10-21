@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stage 7: Multi-Object Tracking — Project Perceptron Pipeline</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../css/pipeline.css">
+</head>
+<body class="min-h-screen flex flex-col bg-[#060913] text-slate-100 selection:bg-cyan-500 selection:text-black">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="../index.html" class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-black text-black text-sm hover:opacity-90">
+        P
+      </a>
+      <div class="flex items-center gap-2 text-xs font-mono">
+        <a href="../index.html" class="text-slate-400 hover:text-white">Pipeline Overview</a>
+        <span class="text-slate-600">/</span>
+        <span class="text-cyan-400 font-bold">Stage 7: Multi-Object Tracking</span>
+      </div>
+    </div>
+    
+    <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/tree/feature/carla-sim-perception" 
+       target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-cyan-400 hover:underline">
+      Branch: feature/carla-sim-perception ↗
+    </a>
+  </header>
+
+  <!-- Content Container -->
+  <main class="max-w-5xl mx-auto px-6 py-10 w-full flex-1">
+    
+    <!-- Stage Title Badge -->
+    <div class="mb-6">
+      <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
+            style="background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b60">
+        Stage 07 • State & Identity Filtering
+      </span>
+      <h1 class="text-3xl md:text-5xl font-black text-white mt-3 mb-4">
+        Multi-Object Tracking
+      </h1>
+      <p class="text-base text-slate-300 leading-relaxed">
+        Tracks fused 3D objects over time in odom frame using constant-velocity Kalman filters, Hungarian assignment with Mahalanobis gating, and track lifecycle state machines.
+      </p>
+    </div>
+
+    <!-- Sub-Steps Section -->
+    <section class="my-10">
+      <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full" style="background: #f59e0b"></span>
+        Detailed Sequential Sub-Steps
+      </h2>
+      <div class="space-y-4">
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 7.1</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Ego-Motion Compensation (TF Buffer)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Transforms object centroids from base_footprint to odom at detection timestamp using non-blocking asynchronous queue to prevent TF stalls.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 7.2</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Mahalanobis Distance Gating</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Evaluates innovation covariance S = H P H^T + R; gates candidate detections using Chi-squared threshold (chi2 = 9.21 for 99% confidence).</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 7.3</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Hungarian Optimal Assignment</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Constructs cost matrix from Mahalanobis distances and executes SciPy linear_sum_assignment to match detections to active tracks.</p>
+          </div>
+        
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 7.4</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Track Lifecycle State Machine</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Transitions tracks: TENTATIVE (hits < 3) -> CONFIRMED (active updates) -> COASTING (misses <= 10) -> DELETED.</p>
+          </div>
+        
+      </div>
+    </section>
+
+    <!-- Nodes & ROS Topics Section -->
+    <section class="my-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Node Implementations -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          Executable Nodes & Modules
+        </h3>
+        <div class="space-y-4">
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">object_tracker_node</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Tracking Core Node</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Maintains multi-target Kalman filters in odom frame; assigns persistent track IDs and computes true metric velocity.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_perception/perceptron_perception/object_tracker_node.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_perception/perceptron_perception/object_tracker_node.py</span> ↗
+                </a>
+              
+            </div>
+          
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">tracker.py</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Kalman Filter Class</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Implements discrete constant-velocity Kalman filter with [x, y, vx, vy] state vector.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_perception/perceptron_perception/tracker.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_perception/perceptron_perception/tracker.py</span> ↗
+                </a>
+              
+            </div>
+          
+        </div>
+      </div>
+
+      <!-- Published Outputs -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+        <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          Published Output Topics
+        </h3>
+        <div class="space-y-3 font-mono text-xs">
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/perception/tracked_objects</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">perceptron_msgs/msg/TrackedObjectArray (in odom)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Trajectory Predictor</div>
+            </div>
+          
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/perception/track_markers</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">visualization_msgs/msg/MarkerArray</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: RViz</div>
+            </div>
+          
+        </div>
+      </div>
+    </section>
+
+    <!-- Code Snippet -->
+    <section class="my-10">
+      <h3 class="text-sm font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+        Core Algorithmic Implementation
+      </h3>
+      <pre class="code-container p-5"><code># TrackedObject.msg state definitions:
+uint8 TENTATIVE=0   # seen, not yet confirmed: do not plan around it yet
+uint8 CONFIRMED=1   # updated by a detection this frame
+uint8 COASTING=2    # confirmed, not seen this frame: position is a prediction
+
+# tracker.py: Mahalanobis gating
+diff = z - H @ x_pred
+S = H @ P_pred @ H.T + R
+chi2 = diff.T @ np.linalg.inv(S) @ diff
+if chi2 <= 9.21: # 99% gate for 2 degrees of freedom
+    accept_match()</code></pre>
+    </section>
+
+    <!-- Bottom Navigation -->
+    <div class="mt-12 pt-6 border-t border-slate-800 flex items-center justify-between">
+      <a href="stage-06-fusion.html" class="text-xs font-mono text-cyan-400 hover:underline">← Stage 06: Camera-LiDAR Sensor Fusion</a>
+      <a href="../index.html" class="text-xs font-mono text-slate-400 hover:text-white">← Main Pipeline Track</a>
+      <a href="stage-08-prediction.html" class="text-xs font-mono text-cyan-400 hover:underline">Stage 08: Trajectory Prediction →</a>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-6 text-center text-xs font-mono text-slate-500">
+    Project Perceptron Autonomous Navigation & Perception Documentation
+  </footer>
+
+</body>
+</html>

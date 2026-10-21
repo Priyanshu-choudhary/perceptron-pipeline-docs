@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Perceptron — Autonomous Navigation & Perception Data Pipeline</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Three.js r128 CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <!-- Custom Pipeline CSS -->
+  <link rel="stylesheet" href="css/pipeline.css">
+</head>
+<body class="min-h-screen flex flex-col selection:bg-cyan-500 selection:text-black">
+
+  <!-- Top Global Navigation Bar -->
+  <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 flex items-center justify-center font-black text-black text-sm tracking-wider shadow-lg shadow-cyan-500/20">
+        P
+      </div>
+      <div>
+        <h1 class="font-extrabold text-sm md:text-base text-white tracking-wide flex items-center gap-2">
+          PROJECT PERCEPTRON
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+            Pipeline Docs
+          </span>
+        </h1>
+        <p class="text-[11px] font-mono text-slate-400">ROS 2 Humble • Jetson Nano • CARLA UE4</p>
+      </div>
+    </div>
+
+    <!-- Mode Switcher & GitHub Links -->
+    <div class="flex items-center gap-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-1 flex items-center gap-1">
+        <button id="mode-carla" class="px-3 py-1.5 text-xs font-semibold rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+          CARLA Sim
+        </button>
+        <button id="mode-real" class="px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white">
+          Real Hardware
+        </button>
+      </div>
+
+      <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/tree/feature/carla-sim-perception" 
+         target="_blank" 
+         class="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono text-slate-200 transition-colors">
+        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        <span>feature/carla-sim-perception</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Interactive Hero Section with 3D Rover Visualizer -->
+  <section class="relative border-b border-slate-800 bg-gradient-to-b from-slate-950 via-[#070b16] to-[#060913] py-10 px-6 overflow-hidden">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      <div class="lg:col-span-7 z-10">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono text-xs mb-4">
+          <span class="pulse-indicator bg-cyan-400"></span>
+          Autonomous Data Pipeline Architecture
+        </div>
+        <h2 class="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight mb-4">
+          12-Stage End-to-End <br>
+          <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-emerald-400 to-indigo-400">
+            Perception & Motion Stack
+          </span>
+        </h2>
+        <p class="text-slate-300 text-sm md:text-base leading-relaxed max-w-xl mb-6">
+          Interactive engineering documentation tracing raw transducer signals, spatial LiDAR ground plane culling, Kalman multi-target tracking, dynamic 3D costmaps, and differential drive execution.
+        </p>
+
+        <div class="flex flex-wrap gap-3 font-mono text-xs">
+          <div class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-2">
+            <span class="text-cyan-400 font-bold">12</span> Pipeline Stages
+          </div>
+          <div class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-2">
+            <span class="text-emerald-400 font-bold">25+</span> ROS 2 Topics
+          </div>
+          <div class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-2">
+            <span class="text-purple-400 font-bold">16</span> Sensor Beams
+          </div>
+          <div class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-2">
+            <span class="text-amber-400 font-bold">100%</span> Exact Code Mapping
+          </div>
+        </div>
+      </div>
+
+      <!-- 3D Canvas Rig -->
+      <div class="lg:col-span-5 relative">
+        <div class="w-full h-[320px] md:h-[380px] rounded-2xl border border-slate-800/80 bg-slate-950/60 shadow-2xl relative overflow-hidden" id="hero-3d-canvas">
+          <div class="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-slate-900/80 backdrop-blur-md border border-slate-800 text-[11px] font-mono text-cyan-400 z-10">
+            3D Rover & LiDAR Frustum
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Flowing Data Packet Bus -->
+  <div class="w-full bg-[#050811] border-b border-slate-800/80 overflow-hidden relative">
+    <div class="max-w-7xl mx-auto relative">
+      <div class="absolute top-2 left-6 text-[10px] font-mono uppercase tracking-widest text-slate-500 z-10 flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+        Active ROS 2 DDS Topic Bus (Live Packet Flow)
+      </div>
+      <canvas id="packet-flow-canvas" class="w-full block"></canvas>
+    </div>
+  </div>
+
+  <!-- Horizontal Pipeline Navigation Controls -->
+  <section class="max-w-7xl mx-auto px-6 pt-8 pb-3 flex items-center justify-between">
+    <div>
+      <h3 class="text-xl font-bold text-white tracking-wide">
+        Interactive Data Pipeline
+      </h3>
+      <p class="text-xs text-slate-400">Scroll horizontally through stages. Click any stage to inspect nodes, schemas, and live simulations.</p>
+    </div>
+
+    <!-- Scroll Arrows -->
+    <div class="flex items-center gap-2">
+      <button id="scroll-left" class="p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors" title="Scroll Left">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <button id="scroll-right" class="p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors" title="Scroll Right">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- Horizontal Stage Track -->
+  <div class="max-w-7xl mx-auto w-full px-6">
+    <div class="pipeline-track" id="pipeline-track">
+      <!-- Populated dynamically by app.js -->
+    </div>
+  </div>
+
+  <!-- Deep Stage Detail Mount -->
+  <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full" id="stage-detail-container">
+    <!-- Populated dynamically when a stage is active -->
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-8 px-6 text-center text-xs font-mono text-slate-400">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div>
+        Project Perceptron • Autonomous Ground Vehicle Systems
+      </div>
+      <div class="flex items-center gap-6 text-slate-400">
+        <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local" target="_blank" class="hover:text-cyan-400">Primary Repository</a>
+        <a href="https://priyanshu-choudhary.github.io/perceptron-autonomy-presentation/" target="_blank" class="hover:text-cyan-400">Autonomy Presentation</a>
+        <a href="https://github.com/Priyanshu-choudhary" target="_blank" class="hover:text-cyan-400">GitHub Profile</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- App Bootstrap -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
