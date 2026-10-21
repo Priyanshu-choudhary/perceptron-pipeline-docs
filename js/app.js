@@ -2,6 +2,7 @@
 
 import { PIPELINE_STAGES, PIPELINE_TOPIC_CONNECTIONS } from './pipeline-data.js';
 import { mountStageStory } from './visualizers/stage-story.js';
+import { mountWholeGraph } from './visualizers/whole-graph.js';
 
 const REPOSITORY = 'https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local';
 
@@ -9,6 +10,8 @@ class PipelineDocsApp {
   constructor() {
     this.activeStage = PIPELINE_STAGES[0];
     this.activeStory = null;
+    this.wholeGraph = mountWholeGraph(document.getElementById('whole-pipeline-graph'), PIPELINE_STAGES, PIPELINE_TOPIC_CONNECTIONS, stage => this.selectStageById(stage.id, false));
+    this.wholeGraph?.setActiveStage(this.activeStage.id);
     this.renderPipelineTrack();
     this.setupScrollControls();
     this.renderStageDetail(this.activeStage);
@@ -46,13 +49,14 @@ class PipelineDocsApp {
     document.getElementById('scroll-right')?.addEventListener('click', () => track?.scrollBy({ left: 520, behavior: 'smooth' }));
   }
 
-  selectStageById(id) {
+  selectStageById(id, scrollToCard = true) {
     const stage = PIPELINE_STAGES.find(item => item.id === id);
     if (!stage) return;
     this.activeStage = stage;
+    this.wholeGraph?.setActiveStage(stage.id);
     this.renderPipelineTrack();
     this.renderStageDetail(stage);
-    document.getElementById(`card-${stage.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    if (scrollToCard) document.getElementById(`card-${stage.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 
   renderStageDetail(stage) {

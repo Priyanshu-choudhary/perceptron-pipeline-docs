@@ -893,6 +893,7 @@ def send_cmd_vel(self, vx: float, wz: float):
     inputs: [
       { topic: "/plan", type: "nav_msgs/msg/Path", source: "Nav2 Planner" },
       { topic: "/local_plan", type: "nav_msgs/msg/Path", source: "Nav2 controller (when enabled)" },
+      { topic: "/perception/track_markers", type: "visualization_msgs/msg/MarkerArray", source: "object_tracker_node (telemetry / visualization path)" },
       { topic: "/camera/image_raw and /points", type: "sensor_msgs messages", source: "Camera and LiDAR drivers (lidar overlay path)" }
     ],
     outputs: [
@@ -908,20 +909,22 @@ zmq_socket.send_multipart([b"overlay", msgpack.packb(poly_points)])`
 ];
 
 export const PIPELINE_TOPIC_CONNECTIONS = [
-  { fromStage: 1, toStage: 2, topic: "Raw Sensors -> Bridges", type: "Hardware Transducers" },
-  { fromStage: 2, toStage: 3, topic: "/odom & /imu/data_raw", type: "nav_msgs/msg/Odometry, sensor_msgs/msg/Imu" },
-  { fromStage: 3, toStage: 4, topic: "TF: odom -> base_footprint", type: "TF Transform" },
-  { fromStage: 2, toStage: 5, topic: "/carla/lidar/points (CARLA perception path)", type: "sensor_msgs/msg/PointCloud2" },
-  { fromStage: 2, toStage: 6, topic: "/carla/ground_truth/boxes_2d (CARLA reference detections)", type: "vision_msgs/msg/Detection2DArray" },
-  { fromStage: 5, toStage: 6, topic: "/perception/points_obstacles", type: "sensor_msgs/PointCloud2" },
-  { fromStage: 6, toStage: 7, topic: "/perception/objects", type: "vision_msgs/Detection3DArray" },
-  { fromStage: 7, toStage: 8, topic: "/perception/tracked_objects", type: "perceptron_msgs/TrackedObjectArray" },
-  { fromStage: 8, toStage: 9, topic: "/perception/predicted_objects", type: "perceptron_msgs/PredictedObjectArray" },
-  { fromStage: 5, toStage: 9, topic: "/perception/points_obstacles and /perception/points_ground", type: "sensor_msgs/msg/PointCloud2" },
-  { fromStage: 2, toStage: 9, topic: "/odom", type: "nav_msgs/msg/Odometry" },
-  { fromStage: 4, toStage: 10, topic: "/map (global occupancy)", type: "nav_msgs/OccupancyGrid" },
-  { fromStage: 2, toStage: 10, topic: "/scan (hardware navigation path)", type: "sensor_msgs/msg/LaserScan" },
-  { fromStage: 10, toStage: 11, topic: "/cmd_vel", type: "geometry_msgs/Twist" },
-  { fromStage: 10, toStage: 12, topic: "/plan", type: "nav_msgs/Path" },
-  { fromStage: 7, toStage: 12, topic: "/perception/track_markers", type: "visualization_msgs/MarkerArray" }
+  { fromStage: 1, toStage: 2, topic: "LD19 LiDAR serial stream", type: "LDROBOT LD19 protocol / serial", fromNode: "Physical sensors + motor controller", toNode: "jetson_bridge_node", fromOutputIndex: 0, toInputIndex: 1 },
+  { fromStage: 1, toStage: 2, topic: "STM32 0x55 / 0x56 telemetry frames", type: "TinyFrame / UART serial", fromNode: "Physical sensors + motor controller", toNode: "stm32_bridge_node", fromOutputIndex: 1, toInputIndex: 1 },
+  { fromStage: 1, toStage: 2, topic: "CARLA synchronous sensor tick", type: "CARLA RPC", fromNode: "CARLA sensor actors", toNode: "carla_bridge", fromOutputIndex: 2, toInputIndex: 2 },
+  { fromStage: 2, toStage: 3, topic: "/odom & /imu/data_raw", type: "nav_msgs/msg/Odometry, sensor_msgs/msg/Imu", fromNode: "jetson_bridge_node / stm32_bridge_node", toNode: "ekf_filter_node" },
+  { fromStage: 3, toStage: 4, topic: "TF: odom -> base_footprint", type: "TF Transform", fromNode: "ekf_filter_node", toNode: "amcl / async_slam_toolbox_node" },
+  { fromStage: 2, toStage: 5, topic: "/carla/lidar/points (CARLA perception path)", type: "sensor_msgs/msg/PointCloud2", fromNode: "carla_bridge", toNode: "lidar_preprocessor_node" },
+  { fromStage: 2, toStage: 6, topic: "/carla/ground_truth/boxes_2d (CARLA reference detections)", type: "vision_msgs/msg/Detection2DArray", fromNode: "carla_bridge", toNode: "object_fusion_node" },
+  { fromStage: 5, toStage: 6, topic: "/perception/points_obstacles", type: "sensor_msgs/PointCloud2", fromNode: "lidar_preprocessor_node", toNode: "object_fusion_node" },
+  { fromStage: 6, toStage: 7, topic: "/perception/objects", type: "vision_msgs/Detection3DArray", fromNode: "object_fusion_node", toNode: "object_tracker_node" },
+  { fromStage: 7, toStage: 8, topic: "/perception/tracked_objects", type: "perceptron_msgs/TrackedObjectArray", fromNode: "object_tracker_node", toNode: "trajectory_predictor_node" },
+  { fromStage: 8, toStage: 9, topic: "/perception/predicted_objects", type: "perceptron_msgs/PredictedObjectArray", fromNode: "trajectory_predictor_node", toNode: "costmap_node" },
+  { fromStage: 5, toStage: 9, topic: "/perception/points_obstacles and /perception/points_ground", type: "sensor_msgs/msg/PointCloud2", fromNode: "lidar_preprocessor_node", toNode: "costmap_node" },
+  { fromStage: 2, toStage: 9, topic: "/odom", type: "nav_msgs/msg/Odometry", fromNode: "jetson_bridge_node / carla_bridge", toNode: "costmap_node" },
+  { fromStage: 4, toStage: 10, topic: "/map (global occupancy)", type: "nav_msgs/OccupancyGrid", fromNode: "async_slam_toolbox_node / map_server", toNode: "planner_server" },
+  { fromStage: 2, toStage: 10, topic: "/scan (hardware navigation path)", type: "sensor_msgs/msg/LaserScan", fromNode: "jetson_bridge_node", toNode: "controller_server" },
+  { fromStage: 10, toStage: 11, topic: "/cmd_vel", type: "geometry_msgs/Twist", fromNode: "controller_server", toNode: "stm32_bridge_node" },
+  { fromStage: 10, toStage: 12, topic: "/plan", type: "nav_msgs/Path", fromNode: "planner_server", toNode: "path_overlay_node" },
+  { fromStage: 7, toStage: 12, topic: "/perception/track_markers", type: "visualization_msgs/MarkerArray", fromNode: "object_tracker_node", toNode: "RViz / telemetry consumer" }
 ];
