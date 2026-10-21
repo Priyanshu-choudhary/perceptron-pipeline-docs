@@ -1,6 +1,6 @@
 # Perceptron Autonomous Navigation & Perception Data Pipeline Documentation
 
-An interactive, 3D animated, multi-page technical documentation platform visualizing the complete end-to-end data pipeline of Project Perceptron, from raw transducers to perception, tracking, prediction, costmaps, and Nav2 motion planning.
+An interactive, graph-first documentation site for following Project Perceptron data from sensors through ROS 2 processing stages to planning, actuators, and telemetry. The landing page presents a horizontal stage graph; selecting a stage opens its recorded inputs, nodes, processing steps, output topics, message types, rates, targets, and stage handoffs.
 
 🌐 **Live Documentation Website:**  
 **[https://priyanshu-choudhary.github.io/perceptron-pipeline-docs/](https://priyanshu-choudhary.github.io/perceptron-pipeline-docs/)**
@@ -29,18 +29,16 @@ An interactive, 3D animated, multi-page technical documentation platform visuali
 
 ---
 
-## 🚀 Key Interactive Visualizers
+## Interactive views
 
-- **Interactive 3D Rover Rig (Three.js)**: 16-beam rotating LiDAR frustum, camera projection cone, and skid-steer wheels.
-- **Dynamic Packet-Flow Engine**: Real-time canvas particle system rendering flowing DDS topic packets.
-- **3D LiDAR Ground Plane Simulator**: Interactive RANSAC ground separation toggle and 2D bounding cluster extraction.
-- **Kalman Filter Covariance Simulator**: Real-time Mahalanobis $2\sigma$ error ellipse expansion and track lifecycle states.
-- **Trajectory Horizon Simulator**: Time-stepped forward projection ribbons comparing CV and CTRV models.
-- **Multi-Layer Costmap Simulator**: Interactive layer toggles for Voxel Obstacles, Inflation, and Dynamic Risk Ribbons.
+- The horizontal overview lists the connections recorded between stages and previews each stage's first documented output.
+- Each expanded stage shows a left-to-right input → node → output flow, followed by its ordered substeps and connected topic handoffs.
+- Interactive LiDAR, Kalman, prediction, and costmap views remain available for selected stages.
+- Source links point to the `feature/carla-sim-perception` branch. The topic and node lists are the documentation's recorded interfaces; follow the source links to confirm implementation details.
 
 ---
 
-## 🛠 Local Development & Testing
+## Local preview
 
 Open `index.html` directly in any modern browser:
 ```bash

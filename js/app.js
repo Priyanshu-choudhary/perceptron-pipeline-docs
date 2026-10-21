@@ -1,374 +1,135 @@
-/**
- * Main Application Orchestrator for Perceptron Pipeline Docs
- */
+/** Interactive, graph-first documentation for the Perceptron data pipeline. */
 
-import { PIPELINE_STAGES } from './pipeline-data.js';
-import { RoverHeroScene } from './visualizers/three-scene.js';
-import { PacketFlowEngine } from './packet-flow.js';
+import { PIPELINE_STAGES, PIPELINE_TOPIC_CONNECTIONS } from './pipeline-data.js';
 import { LidarSimulator } from './visualizers/lidar-sim.js';
 import { KalmanSimulator } from './visualizers/kalman-sim.js';
 import { PredictionSimulator } from './visualizers/prediction-sim.js';
 import { CostmapSimulator } from './visualizers/costmap-sim.js';
 
+const REPOSITORY = 'https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local';
+
 class PipelineDocsApp {
   constructor() {
-    this.currentMode = 'carla'; // 'carla' or 'real'
     this.activeStage = PIPELINE_STAGES[0];
     this.activeSim = null;
-
-    this.init();
-  }
-
-  init() {
     this.renderPipelineTrack();
     this.setupScrollControls();
-    this.setupModeToggle();
-    this.initHeroScene();
-    this.initPacketFlow();
-    this.selectStage(PIPELINE_STAGES[4]); // Default select Stage 5 (LiDAR Preprocessing)
-  }
-
-  initHeroScene() {
-    new RoverHeroScene('hero-3d-canvas');
-  }
-
-  initPacketFlow() {
-    new PacketFlowEngine('packet-flow-canvas');
+    this.renderStageDetail(this.activeStage);
   }
 
   renderPipelineTrack() {
     const track = document.getElementById('pipeline-track');
+    const count = document.getElementById('pipeline-stage-count');
     if (!track) return;
+    if (count) count.textContent = `· ${PIPELINE_STAGES.length} stages`;
 
-    track.innerHTML = PIPELINE_STAGES.map(stage => `
-      <div class="stage-card ${stage.id === this.activeStage?.id ? 'active' : ''}" 
-           id="card-${stage.id}"
-           style="--card-accent: ${stage.color}; --card-glow: ${stage.bgGlow}"
-           onclick="window.app.selectStageById('${stage.id}')">
-        <div class="p-5 flex flex-col h-full justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-mono font-bold px-2.5 py-1 rounded-md" 
-                    style="background: rgba(255,255,255,0.06); color: ${stage.color}; border: 1px solid ${stage.color}40">
-                STAGE ${stage.num < 10 ? '0' + stage.num : stage.num}
-              </span>
-              <span class="text-[11px] font-mono text-slate-400">
-                ${stage.subSteps.length} Sub-steps
-              </span>
-            </div>
-
-            <h3 class="text-lg font-bold text-white mb-1.5 flex items-center gap-2">
-              ${stage.title}
-            </h3>
-            
-            <p class="text-xs text-slate-400 leading-relaxed mb-4 line-clamp-2">
-              ${stage.summary}
-            </p>
-          </div>
-
-          <div>
-            <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
-              <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full" style="background: ${stage.color}"></span>
-                <span>${stage.nodes.length} Nodes</span>
-              </div>
-              <a href="stages/${stage.slug}.html" class="text-cyan-400 hover:underline flex items-center gap-1" onclick="event.stopPropagation()">
-                Details ↗
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    `).join('');
+    track.innerHTML = PIPELINE_STAGES.map((stage, index) => {
+      const outgoing = PIPELINE_TOPIC_CONNECTIONS.filter(edge => edge.fromStage === stage.num);
+      const primaryTopic = stage.outputs?.[0];
+      const targets = [...new Set(outgoing.map(edge => edge.toStage))];
+      return `
+        <div class="stage-stop ${stage.id === this.activeStage.id ? 'is-selected' : ''}" style="--stage-accent:${stage.color}; --stage-glow:${stage.bgGlow}">
+          <button class="stage-card" id="card-${stage.id}" type="button" aria-pressed="${stage.id === this.activeStage.id}" aria-controls="stage-detail-container" onclick="window.app.selectStageById('${stage.id}')">
+            <span class="stage-card-top"><span class="stage-index">${String(stage.num).padStart(2, '0')}</span><span class="stage-category">${stage.badge}</span></span>
+            <span class="stage-title">${stage.title}</span>
+            <span class="stage-meta">${stage.nodes.length} node${stage.nodes.length === 1 ? '' : 's'} <i></i> ${stage.subSteps.length} steps</span>
+            ${primaryTopic ? `<span class="stage-output-preview"><span>OUTPUT</span><code>${primaryTopic.topic}</code></span>` : ''}
+            <span class="stage-open">${stage.id === this.activeStage.id ? 'Expanded ↓' : 'Open stage →'}</span>
+          </button>
+          <div class="stage-wire" aria-hidden="true"><span></span><b>›</b></div>
+          ${outgoing.length ? `<div class="stage-links" aria-label="Documented connections from stage ${stage.num}">${outgoing.map(edge => `<span><b>${String(edge.toStage).padStart(2, '0')}</b><code>${edge.topic}</code></span>`).join('')}</div>` : '<div class="stage-links stage-links-empty">No outgoing connection listed</div>'}
+          ${index === PIPELINE_STAGES.length - 1 ? '<div class="pipeline-end">END OF DOCUMENTED FLOW</div>' : ''}
+        </div>`;
+    }).join('');
   }
 
   setupScrollControls() {
     const track = document.getElementById('pipeline-track');
-    const btnLeft = document.getElementById('scroll-left');
-    const btnRight = document.getElementById('scroll-right');
-
-    if (btnLeft && track) {
-      btnLeft.addEventListener('click', () => {
-        track.scrollBy({ left: -360, behavior: 'smooth' });
-      });
-    }
-    if (btnRight && track) {
-      btnRight.addEventListener('click', () => {
-        track.scrollBy({ left: 360, behavior: 'smooth' });
-      });
-    }
-  }
-
-  setupModeToggle() {
-    const btnCarla = document.getElementById('mode-carla');
-    const btnReal = document.getElementById('mode-real');
-
-    if (btnCarla && btnReal) {
-      btnCarla.addEventListener('click', () => {
-        this.currentMode = 'carla';
-        btnCarla.className = "px-3 py-1.5 text-xs font-semibold rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
-        btnReal.className = "px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white";
-        this.renderStageDetail(this.activeStage);
-      });
-
-      btnReal.addEventListener('click', () => {
-        this.currentMode = 'real';
-        btnReal.className = "px-3 py-1.5 text-xs font-semibold rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
-        btnCarla.className = "px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white";
-        this.renderStageDetail(this.activeStage);
-      });
-    }
+    document.getElementById('scroll-left')?.addEventListener('click', () => track?.scrollBy({ left: -520, behavior: 'smooth' }));
+    document.getElementById('scroll-right')?.addEventListener('click', () => track?.scrollBy({ left: 520, behavior: 'smooth' }));
   }
 
   selectStageById(id) {
-    const stage = PIPELINE_STAGES.find(s => s.id === id);
-    if (stage) this.selectStage(stage);
-  }
-
-  selectStage(stage) {
+    const stage = PIPELINE_STAGES.find(item => item.id === id);
+    if (!stage) return;
     this.activeStage = stage;
-
-    // Update active card class
-    document.querySelectorAll('.stage-card').forEach(el => el.classList.remove('active'));
-    const activeEl = document.getElementById(`card-${stage.id}`);
-    if (activeEl) {
-      activeEl.classList.add('active');
-      activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
-
+    this.renderPipelineTrack();
     this.renderStageDetail(stage);
+    document.getElementById(`card-${stage.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 
   renderStageDetail(stage) {
     const container = document.getElementById('stage-detail-container');
     if (!container) return;
+    this.activeSim?.destroy();
+    this.activeSim = null;
 
-    if (this.activeSim) {
-      this.activeSim.destroy();
-      this.activeSim = null;
-    }
+    const inputs = stage.inputs?.length ? stage.inputs.map(input => `
+      <article class="flow-item source-item"><span class="flow-item-kind">${input.type || 'Input'}</span><h5>${input.name}</h5><p>From ${input.source || 'source not specified'}</p></article>`).join('') : '<p class="flow-empty">No inputs listed for this stage.</p>';
+    const nodes = stage.nodes?.length ? stage.nodes.map(node => `
+      <article class="flow-item node-item"><span class="flow-item-kind">${node.type || 'Processing node'}</span><h5>${node.name}</h5><p>${node.role || ''}</p>${node.file ? `<a href="${REPOSITORY}/blob/feature/carla-sim-perception/${node.file}" target="_blank" rel="noreferrer">Open source file ↗</a>` : ''}</article>`).join('') : '<p class="flow-empty">No nodes listed for this stage.</p>';
+    const outputs = stage.outputs?.length ? stage.outputs.map(output => `
+      <article class="flow-item output-item"><span class="flow-item-kind">PUBLISHED DATA</span><h5><code>${output.topic}</code></h5><p>${output.type || 'Message type not listed'}</p><div class="output-meta"><span>${output.rate || 'Rate not listed'}</span><span>→ ${output.target || 'Target not listed'}</span></div></article>`).join('') : '<p class="flow-empty">No outputs listed for this stage.</p>';
+    const steps = stage.subSteps?.map((step, index) => `
+      <article class="step-node"><span class="step-number">${step.step}</span><div><h5>${step.title}</h5><p>${step.desc}</p><div class="step-foot"><span>FRAME <b>${step.frame || 'Not listed'}</b></span><span>RATE <b>${step.rate || 'Not listed'}</b></span></div></div>${index < stage.subSteps.length - 1 ? '<span class="step-arrow" aria-hidden="true">→</span>' : ''}</article>`).join('') || '<p class="flow-empty">No processing steps listed.</p>';
+    const connections = PIPELINE_TOPIC_CONNECTIONS.filter(edge => edge.fromStage === stage.num || edge.toStage === stage.num);
+    const edges = connections.map(edge => `<span class="connection-chip"><b>${String(edge.fromStage).padStart(2, '0')} → ${String(edge.toStage).padStart(2, '0')}</b><code>${edge.topic}</code><small>${edge.type}</small></span>`).join('') || '<span class="flow-empty">No stage-to-stage topic connection listed.</span>';
 
     container.innerHTML = `
-      <div class="glass-panel rounded-2xl p-6 md:p-8 border border-slate-800 glow-cyan animate-fade-in">
-        <!-- Stage Header -->
-        <div class="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-800">
-          <div>
-            <div class="flex items-center gap-3 mb-2">
-              <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
-                    style="background: ${stage.color}20; color: ${stage.color}; border: 1px solid ${stage.color}60">
-                Stage ${stage.num} • ${stage.badge}
-              </span>
-              <span class="text-xs font-mono text-slate-400">
-                Active Target: ${this.currentMode === 'carla' ? 'CARLA Simulation Stack' : 'Physical Jetson & STM32'}
-              </span>
-            </div>
-            <h2 class="text-2xl md:text-3xl font-extrabold text-white">
-              ${stage.title}
-            </h2>
-          </div>
-
-          <div class="flex items-center gap-3">
-            <a href="stages/${stage.slug}.html" class="px-4 py-2 text-xs font-mono font-bold rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 flex items-center gap-2">
-              <span>Full Stage Documentation</span>
-              <span>→</span>
-            </a>
-          </div>
+      <div class="expanded-stage" style="--stage-accent:${stage.color};--stage-glow:${stage.bgGlow}">
+        <header class="expanded-header"><div><div class="expanded-kicker">STAGE ${String(stage.num).padStart(2, '0')} <span>·</span> ${stage.badge}</div><h2>${stage.title}</h2><p>${stage.summary}</p></div><a class="stage-doc-link" href="stages/${stage.slug}.html">Stage notes ↗</a></header>
+        <div class="flow-graph" aria-label="Inputs flow through nodes to outputs">
+          <section class="flow-lane"><div class="lane-heading"><span>01</span><div><b>INPUTS</b><small>What enters this stage</small></div></div><div class="lane-items">${inputs}</div></section>
+          <div class="lane-connector" aria-hidden="true"><span></span><b>›</b></div>
+          <section class="flow-lane"><div class="lane-heading"><span>02</span><div><b>PROCESSING NODES</b><small>Who handles the data</small></div></div><div class="lane-items">${nodes}</div></section>
+          <div class="lane-connector" aria-hidden="true"><span></span><b>›</b></div>
+          <section class="flow-lane"><div class="lane-heading"><span>03</span><div><b>OUTPUTS</b><small>Topic · type · rate · target</small></div></div><div class="lane-items">${outputs}</div></section>
         </div>
-
-        <p class="text-slate-300 text-sm md:text-base leading-relaxed my-6">
-          ${stage.summary}
-        </p>
-
-        <!-- Sub-Steps Grid -->
-        <div class="mb-8">
-          <h4 class="text-xs font-mono uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
-            <span class="w-1.5 h-1.5 rounded-full" style="background: ${stage.color}"></span>
-            Sub-Stage Processing Pipeline (${stage.subSteps.length} Sequential Steps)
-          </h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            ${stage.subSteps.map(s => `
-              <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step ${s.step}</span>
-                  <span class="text-[10px] font-mono text-slate-400">${s.rate}</span>
-                </div>
-                <h5 class="text-sm font-semibold text-white mb-1">${s.title}</h5>
-                <p class="text-xs text-slate-400 leading-normal mb-2">${s.desc}</p>
-                <div class="text-[10px] font-mono text-emerald-400">Frame: ${s.frame}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- Interactive Visualizer + Topics Row -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <!-- Visualizer Column -->
-          <div class="lg:col-span-7">
-            <h4 class="text-xs font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              Live Interactive Simulation & Telemetry
-            </h4>
-            <div class="sim-canvas-box" style="height: 340px;">
-              <canvas id="active-stage-canvas" width="600" height="340" class="w-full h-full block"></canvas>
-              <div id="sim-controls-mount" class="sim-overlay-controls"></div>
-            </div>
-          </div>
-
-          <!-- Topics & Nodes Column -->
-          <div class="lg:col-span-5 flex flex-col gap-4">
-            <div>
-              <h4 class="text-xs font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                Associated ROS 2 Topics
-              </h4>
-              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 text-xs font-mono space-y-2.5 max-h-[160px] overflow-y-auto">
-                ${stage.outputs.map(out => `
-                  <div class="flex items-start justify-between border-b border-slate-800/60 pb-2">
-                    <div>
-                      <div class="text-cyan-300 font-bold">${out.topic}</div>
-                      <div class="text-[10px] text-slate-400">${out.type}</div>
-                    </div>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${out.rate || 'Event'}</span>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-
-            <div>
-              <h4 class="text-xs font-mono uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                Code & Node References
-              </h4>
-              <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-xs font-mono space-y-2">
-                ${stage.nodes.map(n => `
-                  <div class="flex items-center justify-between">
-                    <span class="text-white font-semibold">${n.name}</span>
-                    <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/${n.file || ''}" 
-                       target="_blank" 
-                       class="text-xs text-cyan-400 hover:underline">
-                      view code ↗
-                    </a>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Code Snippet Viewer -->
-        <div class="mt-8">
-          <div class="flex items-center justify-between mb-2">
-            <h4 class="text-xs font-mono uppercase tracking-wider text-slate-400 flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
-              Core Mathematical & Algorithmic Implementation
-            </h4>
-            <span class="text-[11px] font-mono text-slate-400">Python 3 / ROS 2 Humble</span>
-          </div>
-          <pre class="code-container p-4"><code>${stage.codeSnippet}</code></pre>
-        </div>
-      </div>
-    `;
-
-    // Initialize the appropriate interactive canvas visualizer for this stage
+        <section class="substeps-section"><div class="section-heading"><div><span class="section-index">04</span><h3>Inside this stage</h3></div><span>${stage.subSteps.length} documented steps</span></div><div class="steps-flow">${steps}</div></section>
+        <details class="connections-details"><summary>Show connected stage handoffs <span>${connections.length} listed links</span></summary><div class="connections-list">${edges}</div></details>
+        ${this.hasVisualizer(stage.num) ? `<section class="sim-section"><div class="section-heading"><div><span class="section-index">05</span><h3>Interactive view</h3></div><span>Illustrative stage visualization</span></div><div class="sim-canvas-box"><canvas id="active-stage-canvas" width="900" height="360" aria-label="Interactive stage visualization"></canvas><div id="sim-controls-mount" class="sim-overlay-controls"></div></div></section>` : ''}
+        ${stage.codeSnippet ? `<details class="code-details"><summary>Inspect implementation snippet <span>from the documented stage notes</span></summary><pre class="code-container"><code>${this.escapeHtml(stage.codeSnippet)}</code></pre></details>` : ''}
+        <footer class="stage-disclaimer">This view reflects the stage inputs, outputs, nodes, and links recorded in this documentation. Open a source link to inspect implementation details.</footer>
+      </div>`;
     this.mountStageVisualizer(stage.num);
   }
 
-  mountStageVisualizer(stageNum) {
-    const controlsMount = document.getElementById('sim-controls-mount');
+  hasVisualizer(num) {
+    return [1, 3, 5, 7, 8, 9, 10].includes(num);
+  }
 
-    if (stageNum === 5 || stageNum === 1) {
-      // LiDAR Simulator
-      const sim = new LidarSimulator('active-stage-canvas');
-      this.activeSim = sim;
-      if (controlsMount) {
-        controlsMount.innerHTML = `
-          <div class="flex items-center gap-3">
-            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-              <input type="checkbox" id="chk-ground" checked class="rounded bg-slate-800 border-slate-700 text-cyan-500">
-              <span>Filter Ground Plane (RANSAC)</span>
-            </label>
-            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-              <input type="checkbox" id="chk-clusters" checked class="rounded bg-slate-800 border-slate-700 text-cyan-500">
-              <span>Show 2D Clusters</span>
-            </label>
-          </div>
-          <span class="text-slate-400 font-mono text-[11px]">16 Beams • 10 Hz</span>
-        `;
-        document.getElementById('chk-ground')?.addEventListener('change', e => sim.setGroundFilter(e.target.checked));
-        document.getElementById('chk-clusters')?.addEventListener('change', e => sim.setShowClusters(e.target.checked));
-      }
+  escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+  }
+
+  mountStageVisualizer(stageNum) {
+    const canvas = document.getElementById('active-stage-canvas');
+    if (!canvas) return;
+    const controls = document.getElementById('sim-controls-mount');
+    let sim;
+    if (stageNum === 1 || stageNum === 5) sim = new LidarSimulator('active-stage-canvas');
+    else if (stageNum === 3 || stageNum === 7) sim = new KalmanSimulator('active-stage-canvas');
+    else if (stageNum === 8) sim = new PredictionSimulator('active-stage-canvas');
+    else if (stageNum === 9 || stageNum === 10) sim = new CostmapSimulator('active-stage-canvas');
+    this.activeSim = sim || null;
+
+    if (stageNum === 1 || stageNum === 5) {
+      controls.innerHTML = `<label><input type="checkbox" id="chk-ground" checked> Ground plane filter</label><label><input type="checkbox" id="chk-clusters" checked> Object clusters</label><span>LiDAR / point cloud</span>`;
+      document.getElementById('chk-ground')?.addEventListener('change', event => sim?.setGroundFilter(event.target.checked));
+      document.getElementById('chk-clusters')?.addEventListener('change', event => sim?.setShowClusters(event.target.checked));
     } else if (stageNum === 3 || stageNum === 7) {
-      // Kalman Filter Simulator
-      const sim = new KalmanSimulator('active-stage-canvas');
-      this.activeSim = sim;
-      if (controlsMount) {
-        controlsMount.innerHTML = `
-          <div class="flex items-center gap-2 text-slate-300">
-            <span>Kalman State:</span>
-            <span class="text-emerald-400 font-bold font-mono">CONFIRMED / COASTING</span>
-          </div>
-          <span class="text-slate-400 font-mono text-[11px]">Mahalanobis Gate: χ² ≤ 9.21 (99%)</span>
-        `;
-      }
+      controls.innerHTML = '<span>Kalman state estimation</span><span>Interactive filter view</span>';
     } else if (stageNum === 8) {
-      // Trajectory Prediction Simulator
-      const sim = new PredictionSimulator('active-stage-canvas');
-      this.activeSim = sim;
-      if (controlsMount) {
-        controlsMount.innerHTML = `
-          <div class="flex items-center gap-3 text-slate-300">
-            <label class="flex items-center gap-1.5">
-              <span>Prediction Horizon:</span>
-              <select id="sel-horizon" class="bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-xs text-cyan-300">
-                <option value="2.0">2.0 seconds</option>
-                <option value="1.0">1.0 second</option>
-                <option value="0.5">0.5 seconds</option>
-              </select>
-            </label>
-          </div>
-          <span class="text-slate-400 font-mono text-[11px]">Models: CV & CTRV</span>
-        `;
-        document.getElementById('sel-horizon')?.addEventListener('change', e => sim.setHorizon(e.target.value));
-      }
+      controls.innerHTML = '<label>Prediction horizon <select id="sel-horizon"><option value="2.0">2.0 s</option><option value="1.0">1.0 s</option><option value="0.5">0.5 s</option></select></label><span>CV / CTRV models</span>';
+      document.getElementById('sel-horizon')?.addEventListener('change', event => sim?.setHorizon(event.target.value));
     } else if (stageNum === 9 || stageNum === 10) {
-      // Costmap Simulator
-      const sim = new CostmapSimulator('active-stage-canvas');
-      this.activeSim = sim;
-      if (controlsMount) {
-        controlsMount.innerHTML = `
-          <div class="flex items-center gap-3 text-slate-300">
-            <label class="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" id="chk-voxels" checked> <span>L1: Voxels</span>
-            </label>
-            <label class="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" id="chk-infl" checked> <span>L2: Inflation</span>
-            </label>
-            <label class="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" id="chk-risk" checked> <span>L3: Risk Ribbons</span>
-            </label>
-          </div>
-          <span class="text-slate-400 font-mono text-[11px]">Combined Max-Pool Grid</span>
-        `;
-        const updateLayers = () => {
-          sim.setLayers({
-            voxels: document.getElementById('chk-voxels')?.checked,
-            inflation: document.getElementById('chk-infl')?.checked,
-            dynamicRisk: document.getElementById('chk-risk')?.checked
-          });
-        };
-        document.getElementById('chk-voxels')?.addEventListener('change', updateLayers);
-        document.getElementById('chk-infl')?.addEventListener('change', updateLayers);
-        document.getElementById('chk-risk')?.addEventListener('change', updateLayers);
-      }
-    } else {
-      // Default fallback: Three.js or simple animated stream
-      const sim = new LidarSimulator('active-stage-canvas');
-      this.activeSim = sim;
+      controls.innerHTML = '<label><input type="checkbox" data-layer="voxels" checked> Voxels</label><label><input type="checkbox" data-layer="inflation" checked> Inflation</label><label><input type="checkbox" data-layer="dynamicRisk" checked> Risk layer</label>';
+      const updateLayers = () => sim?.setLayers(Object.fromEntries([...controls.querySelectorAll('[data-layer]')].map(input => [input.dataset.layer, input.checked])));
+      controls.querySelectorAll('[data-layer]').forEach(input => input.addEventListener('change', updateLayers));
     }
   }
 }
 
-// Global bootstrap
 window.addEventListener('DOMContentLoaded', () => {
   window.app = new PipelineDocsApp();
 });
