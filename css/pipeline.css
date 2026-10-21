@@ -205,6 +205,8 @@ body { background: #080d15; color: #e5edf5; overflow-x: hidden; }
 .stage-wire { height: 20px; display: flex; align-items: center; gap: 0; padding: 0 2px; color: #657687; }
 .stage-wire span { height: 1px; background: #39495a; flex: 1; }
 .stage-wire span::after { content: ""; display: block; width: 5px; height: 5px; margin-top: -2px; border-radius: 50%; background: #91b9b4; box-shadow: 0 0 7px #91b9b477; animation: graphPacket 3.8s linear infinite; }
+.stage-wire.is-gap span { visibility: hidden; }
+.stage-wire.is-gap span::after { animation: none; }
 @keyframes graphPacket { from { transform: translateX(0); opacity: .25; } 20% { opacity: .9; } to { transform: translateX(230px); opacity: .15; } }
 .stage-wire b { font-size: 17px; font-weight: 400; }
 .stage-links { display: flex; flex-direction: column; gap: 5px; min-height: 50px; padding: 0 2px; }
@@ -270,9 +272,6 @@ body { background: #080d15; color: #e5edf5; overflow-x: hidden; }
 .sim-overlay-controls select { color: #d9e5ef; background: #15212c; border: 1px solid #314353; padding: 3px 6px; }
 .code-container { margin: 0; border: 0; border-top: 1px solid #273746; border-radius: 0 0 5px 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .stage-disclaimer { padding: 12px 24px; border-top: 1px solid #263443; color: #738494; font: 9px var(--font-mono); }
-.mode-active-carla { color: #9dded7 !important; border-color: #4c988f !important; background: #15302f !important; }
-.mode-active-real { color: #b6d7c2 !important; border-color: #4f8c6a !important; background: #183026 !important; }
-
 @media (max-width: 760px) {
   .pipeline-intro-inner { align-items: flex-start; flex-direction: column; padding: 28px 18px; }
   .pipeline-mode-note { white-space: normal; flex-wrap: wrap; }

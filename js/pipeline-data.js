@@ -13,67 +13,66 @@ export const PIPELINE_STAGES = [
     badge: "Hardware & Sim Input",
     color: "#00e5ff",
     bgGlow: "rgba(0, 229, 255, 0.15)",
-    summary: "Physical rover transducers and CARLA UE4 Town10 synthetic equivalents capturing environmental geometry, inertial dynamics, wheel ticks, and imagery.",
+    summary: "Physical sensors feed the Jetson bridge; CARLA provides a separate synchronized sensor and ground-truth stream for the perception stack. The two paths use different topic names and are shown separately below.",
     subSteps: [
       {
         step: "1.1",
-        title: "3D LiDAR Spatial Scanning",
-        desc: "Velodyne VLP-16 (16-beam, 30 kHz point rate, 10 Hz rotation, 100 m range, 15° downward pitch) or RPLiDAR D500 2D scanner emitting range/azimuth rays.",
-        frame: "lidar3d_link",
+        title: "LiDAR scan / point cloud",
+        desc: "The physical LDROBOT STL-19P path is transported as /scan. CARLA publishes a simulated point cloud on /carla/lidar/points for the perception preprocessing launch.",
+        frame: "laser_frame / lidar3d_link",
         rate: "10 Hz"
       },
       {
         step: "1.2",
-        title: "Inertial Measurement (IMU)",
-        desc: "Pixhack 2.8.4 internal MPU-6000 6-axis gyroscope and accelerometer capturing body rates (rad/s) and specific forces (+9.81 m/s² z at rest).",
+        title: "Inertial measurement",
+        desc: "Hardware bridge nodes publish raw IMU data; CARLA publishes simulated IMU data. The EKF configuration selects angular velocity for local odometry.",
         frame: "imu_link",
         rate: "50-100 Hz"
       },
       {
         step: "1.3",
-        title: "Wheel Quadrature Encoders",
-        desc: "High-resolution quadrature optical encoders on 4 high-torque geared DC motor shafts measuring rotational pulses per millisecond.",
+        title: "Wheel odometry",
+        desc: "The STM32 reports wheel-derived velocity. The CARLA bridge publishes a matching simulated odometry message for simulation runs.",
         frame: "base_link",
         rate: "20-50 Hz"
       },
       {
         step: "1.4",
-        title: "Global Navigation Satellite (GNSS)",
-        desc: "U-blox NEO-M8N GPS module measuring WGS84 Geodetic latitude, longitude, and ellipsoidal altitude with covariance estimates.",
+        title: "GNSS (optional path)",
+        desc: "The Pixhawk bridge publishes /gps/fix; the CARLA bridge publishes a simulated fix when the GPS path is enabled.",
         frame: "gps_link",
         rate: "5 Hz"
       },
       {
         step: "1.5",
-        title: "Monocular Vision Stream",
-        desc: "Sony IMX219 / Wide-Angle camera capturing 1280x720 RGB frames with calibrated intrinsic matrix K and distortion coefficients D.",
+        title: "Camera stream",
+        desc: "CARLA publishes camera images and intrinsics for simulation perception. On the physical robot, the host camera bridge is activated for docking.",
         frame: "camera_optical_link",
         rate: "15-30 Hz"
       }
     ],
     nodes: [
       {
-        name: "Physical Hardware Rig",
-        type: "Physical Transducer",
-        role: "Physical robot instrumentation mounted on vibration-isolated mast.",
+        name: "Physical sensors + motor controller",
+        type: "Hardware source",
+        role: "LDROBOT STL-19P LiDAR, wheel encoders, IMU, and battery sensors produce source data before ROS transport.",
         file: "src/perceptron_robot_description/urdf/perceptron_robot.xacro"
       },
       {
-        name: "CARLA Simulated Sensors",
-        type: "Simulation Actor",
-        role: "CARLA 0.9.15 Unreal Engine 4 sensor actors with synthetic noise injectors (WheelOdometry, ImuOrientation, Gnss).",
+        name: "CARLA sensor actors",
+        type: "Simulation source",
+        role: "CARLA sensor sources and simulated wheel / IMU / GNSS readings; carla_bridge publishes their ROS messages in Stage 02.",
         file: "src/perceptron_carla/perceptron_carla/sim_sensors.py"
       }
     ],
     inputs: [
-      { name: "Photons & Laser Pulses", type: "Environmental Physics", source: "Real World / CARLA Raytracing" },
-      { name: "Wheel Rotation", type: "Kinematics", source: "Motor Shafts" }
+      { name: "LiDAR returns", type: "sensor_msgs/msg/LaserScan or PointCloud2", source: "Physical LiDAR / CARLA sensor" },
+      { name: "Wheel / IMU measurements", type: "Odometry and IMU", source: "STM32 / Pixhawk bridges or CARLA" }
     ],
     outputs: [
-      { topic: "/points (or /carla/lidar/points)", type: "sensor_msgs/msg/PointCloud2", rate: "10 Hz", target: "LiDAR Preprocessor" },
-      { topic: "/imu/data_raw", type: "sensor_msgs/msg/Imu", rate: "50 Hz", target: "Gyro Conditioner & EKF" },
-      { topic: "/gps/fix", type: "sensor_msgs/msg/NavSatFix", rate: "5 Hz", target: "NavSat Transform" },
-      { topic: "/camera/image_raw", type: "sensor_msgs/msg/Image (1280x720 BGR8)", rate: "15-30 Hz", target: "Jetson Pipeline / 2D Detector" }
+      { topic: "LD19 LiDAR serial stream", type: "LDROBOT LD19 protocol", rate: "10 Hz scan", publisher: "STL-19P LiDAR", target: "Jetson host bridge" },
+      { topic: "STM32 0x55 / 0x56 telemetry frames", type: "TinyFrame · wheel odometry / IMU / battery", rate: "About 100 Hz sensor frames", publisher: "STM32 motor controller", target: "Jetson host bridge or stm32_bridge_node" },
+      { topic: "CARLA synchronous sensor tick", type: "LiDAR · camera · IMU · GNSS · ground truth", rate: "Simulation tick", publisher: "CARLA sensor actors", target: "carla_bridge" }
     ],
     codeSnippet: `# sim_sensors.py: Realistic IMU attitude random walk + gyro bias
 class ImuOrientation:
@@ -131,25 +130,43 @@ class ImuOrientation:
       {
         name: "stm32_bridge_node",
         type: "Serial Driver Node",
-        role: "Communicates with STM32F405 ECU; converts encoder deltas into twist-only /odom and issues motor commands.",
+        role: "Reads STM32 telemetry into /odom, /imu/data_raw, and battery measurement topics; subscribes to /cmd_vel for serial motor commands.",
         file: "src/perceptron_hardware/perceptron_hardware/stm32_bridge_node.py"
+      },
+      {
+        name: "pixhack_bridge_node",
+        type: "Sensor Bridge Node",
+        role: "Publishes /imu/data and /gps/fix from Pixhawk telemetry when this optional hardware path is launched.",
+        file: "src/perceptron_hardware/perceptron_hardware/pixhack_bridge_node.py"
       },
       {
         name: "carla_bridge",
         type: "Simulation Orchestrator",
         role: "Translates left-handed CARLA coordinates to right-handed REP 103 ROS conventions and injects sensor noise.",
         file: "src/perceptron_carla/perceptron_carla/carla_bridge.py"
+      },
+      {
+        name: "battery_node",
+        type: "Battery monitor node",
+        role: "Combines measured voltage and current into BatteryState and low / critical battery signals.",
+        file: "src/perceptron_hardware/perceptron_hardware/battery_node.py"
       }
     ],
     inputs: [
       { name: "ZeroMQ Port :5555", type: "TCP Socket", source: "Jetson Nano" },
-      { name: "UART /dev/ttyUSB1", type: "115200 Baud Serial", source: "STM32 ECU" },
+      { name: "UART /dev/ttyUSB0 (configurable)", type: "115200 Baud Serial", source: "STM32 ECU" },
       { name: "CARLA RPC Port 2000", type: "TCP RPC Socket", source: "CARLA Server" }
     ],
     outputs: [
-      { topic: "/odom", type: "nav_msgs/msg/Odometry (twist only, cov=1e6 on pose)", rate: "30 Hz", target: "EKF Local" },
-      { topic: "/imu/data", type: "sensor_msgs/msg/Imu", rate: "50 Hz", target: "EKF Local" },
-      { topic: "/battery/state", type: "sensor_msgs/msg/BatteryState", rate: "1 Hz", target: "Diagnostics" }
+      { topic: "/scan", type: "sensor_msgs/msg/LaserScan", rate: "10 Hz", publisher: "jetson_bridge_node", target: "slam_toolbox / AMCL / Nav2 (hardware)" },
+      { topic: "/odom", type: "nav_msgs/msg/Odometry", rate: "Up to sensor rate", publisher: "jetson_bridge_node or stm32_bridge_node", target: "ekf_filter_node" },
+      { topic: "/imu/data_raw", type: "sensor_msgs/msg/Imu", rate: "Up to sensor rate", publisher: "jetson_bridge_node or stm32_bridge_node", target: "ekf_filter_node" },
+      { topic: "/imu/data", type: "sensor_msgs/msg/Imu", rate: "Configured rate", publisher: "pixhack_bridge_node / carla_bridge", target: "Optional localization path" },
+      { topic: "/battery/measured_voltage and /battery/measured_current", type: "std_msgs/msg/Float32", rate: "From bridge telemetry", publisher: "jetson_bridge_node or stm32_bridge_node", target: "battery_node" },
+      { topic: "/battery/state", type: "sensor_msgs/msg/BatteryState", rate: "battery_node timer", publisher: "battery_node", target: "dock_guard / mission / operator tools" },
+      { topic: "/gps/fix", type: "sensor_msgs/msg/NavSatFix", rate: "Configured rate", publisher: "pixhack_bridge_node or carla_bridge", target: "GPS localization path (when enabled)" },
+      { topic: "/carla/lidar/points + /carla/camera/image_raw", type: "PointCloud2 + Image", rate: "CARLA tick", publisher: "carla_bridge", target: "perceptron_perception nodes" },
+      { topic: "/carla/ground_truth/boxes_2d", type: "vision_msgs/msg/Detection2DArray", rate: "CARLA tick", publisher: "carla_bridge", target: "object_fusion_node (reference detector input)" }
     ],
     codeSnippet: `# stm32_bridge_node.py: Odometry twist-only covariance convention
 # Pose degree-of-freedom variance set to 1e6 so robot_localization treats pose as unmeasured
@@ -193,10 +210,10 @@ msg.twist.covariance = _diag6(TWIST_COV_DIAG)`
     ],
     nodes: [
       {
-        name: "ekf_filter_node_local",
+        name: "ekf_filter_node",
         type: "robot_localization Node",
         role: "Maintains smooth continuous local coordinate system; sole owner of odom -> base_footprint transform.",
-        file: "src/perceptron_navigation/config/ekf_local.yaml"
+        file: "src/perceptron_robot_bringup/config/ekf.yaml"
       },
       {
         name: "gyro_conditioner",
@@ -212,22 +229,22 @@ msg.twist.covariance = _diag6(TWIST_COV_DIAG)`
       }
     ],
     inputs: [
-      { topic: "/odom", type: "nav_msgs/msg/Odometry (wheel vx)", source: "stm32_bridge_node" },
-      { topic: "/imu/data", type: "sensor_msgs/msg/Imu (wz, ax)", source: "pixhack_bridge_node / carla_bridge" }
+      { topic: "/odom", type: "nav_msgs/msg/Odometry (wheel-derived velocity)", source: "jetson_bridge_node or stm32_bridge_node" },
+      { topic: "/imu/data_raw", type: "sensor_msgs/msg/Imu (configured angular velocity)", source: "jetson_bridge_node or stm32_bridge_node" }
     ],
     outputs: [
-      { topic: "/odometry/filtered", type: "nav_msgs/msg/Odometry", rate: "30 Hz", target: "Costmap, Tracker, Nav2" },
-      { topic: "TF: odom -> base_footprint", type: "geometry_msgs/msg/TransformStamped", rate: "30 Hz", target: "TF Tree" }
+      { topic: "/odometry/filtered", type: "nav_msgs/msg/Odometry", rate: "25 Hz in the documented EKF config", publisher: "ekf_filter_node", target: "Odometry consumers" },
+      { topic: "TF: odom -> base_footprint", type: "geometry_msgs/msg/TransformStamped", rate: "EKF rate", publisher: "ekf_filter_node", target: "TF consumers (AMCL / Nav2 / perception)" }
     ],
-    codeSnippet: `# ekf_local.yaml configuration:
-# Only vx (linear) from wheel encoders is fused; yaw is driven strictly by gyro
+    codeSnippet: `# robot_localization EKF configuration:
+# Hardware and simulation launches select the odometry topic; the physical bridge path uses /odom.
 odom0: /odom
 odom0_config: [false, false, false,
                false, false, false,
                true,  false, false,
                false, false, false,
                false, false, false]
-imu0: /imu/data
+imu0: /imu/data_raw
 imu0_config:  [false, false, false,
                false, false, false,
                false, false, false,
@@ -287,13 +304,14 @@ imu0_config:  [false, false, false,
       }
     ],
     inputs: [
-      { topic: "/perception/scan (or /scan)", type: "sensor_msgs/msg/LaserScan", source: "LiDAR Preprocessor" },
+      { topic: "/scan", type: "sensor_msgs/msg/LaserScan", source: "jetson_bridge_node (hardware); CARLA perception uses point-cloud input" },
       { topic: "TF: odom -> base_footprint", type: "geometry_msgs/msg/TransformStamped", source: "EKF Local" }
     ],
     outputs: [
-      { topic: "TF: map -> odom", type: "geometry_msgs/msg/TransformStamped", rate: "10 Hz", target: "TF Tree" },
-      { topic: "/map", type: "nav_msgs/msg/OccupancyGrid", rate: "Latched", target: "Nav2 Global Planner" },
-      { topic: "/particle_cloud", type: "nav_msgs/msg/ParticleCloud", rate: "10 Hz", target: "RViz" }
+      { topic: "TF: map -> odom", type: "geometry_msgs/msg/TransformStamped", rate: "Mode-dependent", publisher: "amcl or slam_toolbox (one active owner)", target: "TF consumers" },
+      { topic: "/map", type: "nav_msgs/msg/OccupancyGrid", rate: "Map update / latched map", publisher: "map_server or slam_toolbox", target: "Nav2 global costmap / planner" },
+      { topic: "/amcl_pose", type: "geometry_msgs/msg/PoseWithCovarianceStamped", rate: "AMCL update", publisher: "amcl", target: "dock_guard / pose consumers" },
+      { topic: "/initialpose", type: "geometry_msgs/msg/PoseWithCovarianceStamped", rate: "On pose seed", publisher: "aruco_localizer_node or operator", target: "amcl" }
     ],
     codeSnippet: `# aruco_localizer_node.py: Seeding AMCL safely without competing for TF ownership
 # AMCL owns map -> odom. This node only provides /initialpose then gets out of the way.
@@ -314,7 +332,7 @@ self.initial_pose_pub.publish(pose_msg)`
     badge: "Geometry & Filtering",
     color: "#8b5cf6",
     bgGlow: "rgba(139, 92, 246, 0.15)",
-    summary: "Filters raw PointCloud2 in base_footprint, separates road surface via RANSAC plane + local elevation grid, clusters obstacle points into bounding boxes, and projects 2D LaserScan.",
+    summary: "CARLA's 3D point-cloud path enters lidar_preprocessor_node, which separates ground and obstacles, labels clusters, and emits perception products. The physical hardware navigation path publishes /scan separately.",
     subSteps: [
       {
         step: "5.1",
@@ -360,14 +378,16 @@ self.initial_pose_pub.publish(pose_msg)`
       }
     ],
     inputs: [
-      { topic: "/points (or /carla/lidar/points)", type: "sensor_msgs/msg/PointCloud2", source: "Sensors / CARLA" },
+      { topic: "/carla/lidar/points", type: "sensor_msgs/msg/PointCloud2", source: "carla_bridge via config/carla.yaml" },
       { topic: "TF: lidar3d_link -> base_footprint", type: "Transform", source: "Robot State Publisher" }
     ],
     outputs: [
-      { topic: "/perception/points_ground", type: "sensor_msgs/msg/PointCloud2", rate: "10 Hz", target: "Costmap Node" },
-      { topic: "/perception/points_obstacles", type: "sensor_msgs/msg/PointCloud2 (x,y,z,cluster)", rate: "10 Hz", target: "Object Fusion & Costmap" },
-      { topic: "/perception/clusters", type: "vision_msgs/msg/Detection3DArray", rate: "10 Hz", target: "Evaluation" },
-      { topic: "/perception/scan", type: "sensor_msgs/msg/LaserScan", rate: "10 Hz", target: "AMCL / Nav2" }
+      { topic: "/perception/points_ground", type: "sensor_msgs/msg/PointCloud2", rate: "Cloud input rate", publisher: "lidar_preprocessor_node", target: "costmap_node" },
+      { topic: "/perception/points_obstacles", type: "sensor_msgs/msg/PointCloud2 (x, y, z, cluster)", rate: "Cloud input rate", publisher: "lidar_preprocessor_node", target: "object_fusion_node and costmap_node" },
+      { topic: "/perception/clusters", type: "vision_msgs/msg/Detection3DArray", rate: "Cloud input rate", publisher: "lidar_preprocessor_node", target: "Evaluation / visualization" },
+      { topic: "/perception/scan", type: "sensor_msgs/msg/LaserScan", rate: "Cloud input rate", publisher: "lidar_preprocessor_node", target: "Perception visualization / optional consumers" },
+      { topic: "/perception/cluster_markers", type: "visualization_msgs/msg/MarkerArray", rate: "Cloud input rate", publisher: "lidar_preprocessor_node", target: "RViz" },
+      { topic: "/perception/lidar_preprocess_stats", type: "std_msgs/msg/Float32MultiArray", rate: "Cloud input rate", publisher: "lidar_preprocessor_node", target: "cloud_eval_node" }
     ],
     codeSnippet: `# cloud_processing.py: Why Ground uses Plane + Height Grid
 # A single RANSAC plane finds the road, but a raised sidewalk sits 10-20 cm above it
@@ -388,7 +408,7 @@ def ground_mask(xyz, plane, cell_size=0.5, cell_height=0.08, plane_thresh=0.06):
     badge: "Multi-Modal Association",
     color: "#ec4899",
     bgGlow: "rgba(236, 72, 153, 0.15)",
-    summary: "Fuses 2D camera bounding boxes (YOLO/reference detector) with 3D LiDAR obstacle points via camera projection and Hungarian affinity matching.",
+    summary: "Associates 2D detections with clustered LiDAR points using camera projection and affinity matching. The CARLA launch uses ground-truth 2D boxes as its reference detector input; the topic is configurable for another detector.",
     subSteps: [
       {
         step: "6.1",
@@ -434,14 +454,16 @@ def ground_mask(xyz, plane, cell_size=0.5, cell_height=0.08, plane_thresh=0.06):
       }
     ],
     inputs: [
-      { topic: "/perception/detections_2d (or /carla/ground_truth/boxes_2d)", type: "vision_msgs/msg/Detection2DArray", source: "Vision Detector" },
-      { topic: "/perception/points_obstacles", type: "sensor_msgs/msg/PointCloud2", source: "LiDAR Preprocessor" },
-      { topic: "/camera/camera_info", type: "sensor_msgs/msg/CameraInfo", source: "Camera Driver" }
+      { topic: "/carla/ground_truth/boxes_2d (CARLA default; configurable detector topic)", type: "vision_msgs/msg/Detection2DArray", source: "carla_bridge / configured 2D detector" },
+      { topic: "/perception/points_obstacles", type: "sensor_msgs/msg/PointCloud2", source: "lidar_preprocessor_node" },
+      { topic: "/carla/camera/camera_info", type: "sensor_msgs/msg/CameraInfo", source: "carla_bridge (CARLA config)" }
     ],
     outputs: [
-      { topic: "/perception/objects", type: "vision_msgs/msg/Detection3DArray (in base_footprint)", rate: "10 Hz", target: "Object Tracker" },
-      { topic: "/perception/objects_json", type: "std_msgs/msg/String", rate: "10 Hz", target: "Logging / Telemetry" },
-      { topic: "/perception/objects_image", type: "sensor_msgs/msg/Image (rendered 2D/3D boxes)", rate: "10 Hz", target: "Web Dashboard" }
+      { topic: "/perception/objects", type: "vision_msgs/msg/Detection3DArray (base_footprint)", rate: "Input pair rate", publisher: "object_fusion_node", target: "object_tracker_node" },
+      { topic: "/perception/objects_json", type: "std_msgs/msg/String", rate: "Input pair rate", publisher: "object_fusion_node", target: "fusion evaluation / tooling" },
+      { topic: "/perception/object_points", type: "sensor_msgs/msg/PointCloud2", rate: "Input pair rate", publisher: "object_fusion_node", target: "fusion evaluation / visualization" },
+      { topic: "/perception/object_markers", type: "visualization_msgs/msg/MarkerArray", rate: "Input pair rate", publisher: "object_fusion_node", target: "RViz" },
+      { topic: "/perception/objects_image", type: "sensor_msgs/msg/Image", rate: "Input pair rate", publisher: "object_fusion_node", target: "Image viewer when subscribed" }
     ],
     codeSnippet: `# object_fusion.py: Affinity metric combining 2D box containment and depth consistency
 def compute_affinity(box_2d, projected_points_uv, cluster_depths):
@@ -511,8 +533,8 @@ def compute_affinity(box_2d, projected_points_uv, cluster_depths):
       { topic: "TF: odom -> base_footprint", type: "Transform", source: "EKF Local" }
     ],
     outputs: [
-      { topic: "/perception/tracked_objects", type: "perceptron_msgs/msg/TrackedObjectArray (in odom)", rate: "10 Hz", target: "Trajectory Predictor" },
-      { topic: "/perception/track_markers", type: "visualization_msgs/msg/MarkerArray", rate: "10 Hz", target: "RViz" }
+      { topic: "/perception/tracked_objects", type: "perceptron_msgs/msg/TrackedObjectArray (odom)", rate: "Detection callback rate", publisher: "object_tracker_node", target: "trajectory_predictor_node" },
+      { topic: "/perception/track_markers", type: "visualization_msgs/msg/MarkerArray", rate: "Detection callback rate", publisher: "object_tracker_node", target: "RViz / telemetry" }
     ],
     codeSnippet: `# TrackedObject.msg state definitions:
 uint8 TENTATIVE=0   # seen, not yet confirmed: do not plan around it yet
@@ -583,8 +605,8 @@ if chi2 <= 9.21: # 99% gate for 2 degrees of freedom
       { topic: "/perception/tracked_objects", type: "perceptron_msgs/msg/TrackedObjectArray", source: "Object Tracker" }
     ],
     outputs: [
-      { topic: "/perception/predicted_objects", type: "perceptron_msgs/msg/PredictedObjectArray", rate: "10 Hz", target: "Dynamic Costmap" },
-      { topic: "/perception/prediction_markers", type: "visualization_msgs/msg/MarkerArray", rate: "10 Hz", target: "RViz" }
+      { topic: "/perception/predicted_objects", type: "perceptron_msgs/msg/PredictedObjectArray", rate: "Track callback rate", publisher: "trajectory_predictor_node", target: "costmap_node" },
+      { topic: "/perception/prediction_markers", type: "visualization_msgs/msg/MarkerArray", rate: "Track callback rate", publisher: "trajectory_predictor_node", target: "RViz" }
     ],
     codeSnippet: `# prediction.py: CTRV closed-form forward projection
 def predict_ctrv(x, y, yaw, v, w, dt):
@@ -649,14 +671,18 @@ def predict_ctrv(x, y, yaw, v, w, dt):
       }
     ],
     inputs: [
-      { topic: "/perception/points_obstacles", type: "sensor_msgs/msg/PointCloud2", source: "LiDAR Preprocessor" },
+      { topic: "/perception/points_obstacles", type: "sensor_msgs/msg/PointCloud2", source: "lidar_preprocessor_node" },
+      { topic: "/perception/points_ground", type: "sensor_msgs/msg/PointCloud2", source: "lidar_preprocessor_node" },
       { topic: "/perception/predicted_objects", type: "perceptron_msgs/msg/PredictedObjectArray", source: "Trajectory Predictor" },
-      { topic: "/odometry/filtered", type: "nav_msgs/msg/Odometry", source: "EKF Local" }
+      { topic: "/odom", type: "nav_msgs/msg/Odometry", source: "Hardware bridge / CARLA bridge" }
     ],
     outputs: [
-      { topic: "/costmap/combined", type: "nav_msgs/msg/OccupancyGrid (0-100 cost)", rate: "10 Hz", target: "Nav2 Local Costmap" },
-      { topic: "/costmap/dynamic_risk", type: "nav_msgs/msg/OccupancyGrid", rate: "10 Hz", target: "RViz & Debug" },
-      { topic: "/costmap/voxels", type: "sensor_msgs/msg/PointCloud2", rate: "10 Hz", target: "3D RViz Visualization" }
+      { topic: "/costmap/obstacles", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz / evaluation" },
+      { topic: "/costmap/inflated", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz / evaluation" },
+      { topic: "/costmap/dynamic_risk", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz / evaluation" },
+      { topic: "/costmap/combined", type: "nav_msgs/msg/OccupancyGrid (0-100 cost)", rate: "Sensor / track input rate", publisher: "costmap_node", target: "CARLA perception evaluation / visualization" },
+      { topic: "/costmap/voxels", type: "sensor_msgs/msg/PointCloud2", rate: "Sensor / track input rate", publisher: "costmap_node", target: "3D RViz visualization" },
+      { topic: "/costmap/stats", type: "std_msgs/msg/Float32MultiArray", rate: "Reported / periodic", publisher: "costmap_node", target: "costmap_eval_node" }
     ],
     codeSnippet: `# costmap.py: Dynamic Risk Ribbon Stamping
 # Predicted paths are stamped as lethal ribbons along the path, with risk falling
@@ -720,18 +746,19 @@ combined_grid = np.maximum(inflated_grid, dynamic_risk_grid)`
       {
         name: "traversability_node",
         type: "Terrain Analysis Node",
-        role: "Identifies craters (negative obstacles) and rocks (positive obstacles) in lunar/outdoor terrain.",
+        role: "Optional terrain analysis node. Its default /points input and /traversability_* outputs form a separate path unless remapped into a navigation costmap.",
         file: "src/perceptron_navigation/perceptron_navigation/traversability_node.py"
       }
     ],
     inputs: [
-      { topic: "/costmap/combined", type: "nav_msgs/msg/OccupancyGrid", source: "Dynamic Costmap" },
-      { topic: "/goal_pose", type: "geometry_msgs/msg/PoseStamped", source: "Operator / Mission Node" },
-      { topic: "/odometry/filtered", type: "nav_msgs/msg/Odometry", source: "EKF Local" }
+      { topic: "/map", type: "nav_msgs/msg/OccupancyGrid", source: "map_server or slam_toolbox" },
+      { topic: "/scan", type: "sensor_msgs/msg/LaserScan", source: "jetson_bridge_node" },
+      { topic: "/odom", type: "nav_msgs/msg/Odometry", source: "jetson_bridge_node / configured odometry source" },
+      { name: "NavigateToPose action goal", type: "geometry_msgs/msg/PoseStamped goal", source: "Operator / mission client" }
     ],
     outputs: [
-      { topic: "/plan", type: "nav_msgs/msg/Path (global coordinates)", rate: "1 Hz", target: "Controller & Camera Overlay" },
-      { topic: "/cmd_vel", type: "geometry_msgs/msg/Twist (vx, wz)", rate: "20 Hz", target: "STM32 Motor Bridge" }
+      { topic: "/plan", type: "nav_msgs/msg/Path (global coordinates)", rate: "On plan update", publisher: "planner_server / Nav2 controller path output", target: "Controller and path_overlay_node" },
+      { topic: "/cmd_vel", type: "geometry_msgs/msg/Twist (vx, wz)", rate: "Controller / smoother rate", publisher: "Nav2 controller + velocity_smoother", target: "jetson_bridge_node or stm32_bridge_node (run mode)" }
     ],
     codeSnippet: `# nav2_params.yaml: Controller RotationShim setup for 4-wheel skid-steer
 controller_server:
@@ -791,19 +818,17 @@ controller_server:
         file: "src/perceptron_hardware/perceptron_hardware/stm32_bridge_node.py"
       },
       {
-        name: "STM32F405 Motor Driver Firmware",
-        type: "Embedded C Firmware",
-        role: "Runs closed-loop current/velocity PID regulation and ADC battery monitoring.",
-        file: "STM32_Serial_motorDriver/Core/Src/main.c"
+        name: "STM32 motor-controller firmware",
+        type: "External embedded firmware",
+        role: "Receives the serial command frame and drives the motor-control hardware. Firmware source is not present in the referenced ROS branch."
       }
     ],
     inputs: [
       { topic: "/cmd_vel", type: "geometry_msgs/msg/Twist", source: "Nav2 Controller" }
     ],
     outputs: [
-      { topic: "UART TX 0xA5 0x01", type: "Serial Bytes", rate: "20 Hz", target: "STM32 ECU" },
-      { topic: "Motor PWM & Direction", type: "MOSFET Drive", rate: "20 kHz PWM", target: "4x High Torque DC Motors" },
-      { topic: "/battery/state", type: "sensor_msgs/msg/BatteryState", rate: "1 Hz", target: "Diagnostics" }
+      { topic: "UART TX 0xA5 0x01", type: "Serial command frame", rate: "Per /cmd_vel update", publisher: "stm32_bridge_node", target: "STM32 motor-controller firmware" },
+      { topic: "Motor PWM & Direction", type: "Motor-driver signals", rate: "Firmware control loop", publisher: "STM32 motor-controller firmware (external)", target: "Motor drivers and wheels" }
     ],
     codeSnippet: `# stm32_bridge_node.py: Serial Command Framing
 def send_cmd_vel(self, vx: float, wz: float):
@@ -867,12 +892,12 @@ def send_cmd_vel(self, vx: float, wz: float):
     ],
     inputs: [
       { topic: "/plan", type: "nav_msgs/msg/Path", source: "Nav2 Planner" },
-      { topic: "/camera/image_raw", type: "sensor_msgs/msg/Image", source: "Camera Driver / CARLA" },
-      { topic: "/perception/track_markers", type: "visualization_msgs/msg/MarkerArray", source: "Object Tracker" }
+      { topic: "/local_plan", type: "nav_msgs/msg/Path", source: "Nav2 controller (when enabled)" },
+      { topic: "/camera/image_raw and /points", type: "sensor_msgs messages", source: "Camera and LiDAR drivers (lidar overlay path)" }
     ],
     outputs: [
-      { topic: "UDP Port 5000 RTP/H.265", type: "Augmented Video Stream", rate: "30 FPS", target: "Operator GCS" },
-      { topic: "/perception/lidar_overlay", type: "sensor_msgs/msg/Image", rate: "10 Hz", target: "Web Console" }
+      { topic: "ZeroMQ :5558 → RTP/UDP :5000", type: "Projected path geometry → H.265 video stream", rate: "Path updates / camera rate", publisher: "path_overlay_node → jetson_path_overlay.py (host process)", target: "Operator video client" },
+      { topic: "/perception/lidar_overlay", type: "sensor_msgs/msg/Image", rate: "Paired image/cloud rate", publisher: "lidar_camera_overlay_node", target: "Image viewer / calibration" }
     ],
     codeSnippet: `# path_overlay_node.py: Projecting planned ribbon into camera pixels
 # Decimated path is ~250 integer pixel pairs (1.2 kB). Pushed via ZMQ to Jetson
@@ -884,16 +909,18 @@ zmq_socket.send_multipart([b"overlay", msgpack.packb(poly_points)])`
 
 export const PIPELINE_TOPIC_CONNECTIONS = [
   { fromStage: 1, toStage: 2, topic: "Raw Sensors -> Bridges", type: "Hardware Transducers" },
-  { fromStage: 2, toStage: 3, topic: "/odom (twist) & /imu/data", type: "nav_msgs/Odometry, sensor_msgs/Imu" },
+  { fromStage: 2, toStage: 3, topic: "/odom & /imu/data_raw", type: "nav_msgs/msg/Odometry, sensor_msgs/msg/Imu" },
   { fromStage: 3, toStage: 4, topic: "TF: odom -> base_footprint", type: "TF Transform" },
-  { fromStage: 1, toStage: 5, topic: "/points", type: "sensor_msgs/PointCloud2" },
+  { fromStage: 2, toStage: 5, topic: "/carla/lidar/points (CARLA perception path)", type: "sensor_msgs/msg/PointCloud2" },
+  { fromStage: 2, toStage: 6, topic: "/carla/ground_truth/boxes_2d (CARLA reference detections)", type: "vision_msgs/msg/Detection2DArray" },
   { fromStage: 5, toStage: 6, topic: "/perception/points_obstacles", type: "sensor_msgs/PointCloud2" },
   { fromStage: 6, toStage: 7, topic: "/perception/objects", type: "vision_msgs/Detection3DArray" },
   { fromStage: 7, toStage: 8, topic: "/perception/tracked_objects", type: "perceptron_msgs/TrackedObjectArray" },
   { fromStage: 8, toStage: 9, topic: "/perception/predicted_objects", type: "perceptron_msgs/PredictedObjectArray" },
-  { fromStage: 5, toStage: 9, topic: "/perception/points_obstacles (voxels)", type: "sensor_msgs/PointCloud2" },
-  { fromStage: 9, toStage: 10, topic: "/costmap/combined", type: "nav_msgs/OccupancyGrid" },
+  { fromStage: 5, toStage: 9, topic: "/perception/points_obstacles and /perception/points_ground", type: "sensor_msgs/msg/PointCloud2" },
+  { fromStage: 2, toStage: 9, topic: "/odom", type: "nav_msgs/msg/Odometry" },
   { fromStage: 4, toStage: 10, topic: "/map (global occupancy)", type: "nav_msgs/OccupancyGrid" },
+  { fromStage: 2, toStage: 10, topic: "/scan (hardware navigation path)", type: "sensor_msgs/msg/LaserScan" },
   { fromStage: 10, toStage: 11, topic: "/cmd_vel", type: "geometry_msgs/Twist" },
   { fromStage: 10, toStage: 12, topic: "/plan", type: "nav_msgs/Path" },
   { fromStage: 7, toStage: 12, topic: "/perception/track_markers", type: "visualization_msgs/MarkerArray" }
