@@ -22,7 +22,7 @@
 <body class="min-h-screen flex flex-col selection:bg-cyan-500 selection:text-black">
 
   <!-- Top Global Navigation Bar -->
-  <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+  <header class="border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-50 px-6 py-3 flex flex-wrap items-center justify-between gap-4">
     <div class="flex items-center gap-3">
       <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 flex items-center justify-center font-black text-black text-sm tracking-wider shadow-lg shadow-cyan-500/20">
         P
@@ -38,59 +38,84 @@
       </div>
     </div>
 
-    <!-- Source repository link -->
-    <div class="flex items-center gap-4">
+    <!-- View Mode Switcher: AlgoMaster Graph vs Horizontal Flow -->
+    <div class="flex items-center gap-3">
+      <div class="view-mode-pill" role="tablist" aria-label="Pipeline layout view switcher">
+        <button type="button" class="view-mode-btn is-active" id="view-mode-algomaster" role="tab" aria-selected="true" title="Top-to-Bottom Giant Graph (AlgoMaster Style)">
+          <span>☲</span>
+          <span>Graph Mode (Top-to-Bottom)</span>
+        </button>
+        <button type="button" class="view-mode-btn" id="view-mode-horizontal" role="tab" aria-selected="false" title="Horizontal Pipeline Track Flow">
+          <span>☵</span>
+          <span>Horizontal Track</span>
+        </button>
+      </div>
+
+      <!-- Source repository link -->
       <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/tree/feature/carla-sim-perception" 
          target="_blank" 
-         class="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono text-slate-200 transition-colors">
+         class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono text-slate-200 transition-colors">
         <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-        <span>feature/carla-sim-perception</span>
+        <span>branch: feature/carla-sim-perception</span>
       </a>
     </div>
   </header>
 
+  <!-- Intro Banner -->
   <section class="pipeline-intro">
     <div class="pipeline-intro-inner">
       <div>
-        <div class="eyebrow">PERCEPTRON / SYSTEM DATA FLOW</div>
-        <h2>Robot data pipeline</h2>
-        <p>Follow each message from its source, through the node that transforms it, to the next consumer. Select a stage to expand its inputs, processing steps, outputs, and code references in the graph.</p>
+        <div class="eyebrow">PERCEPTRON / END-TO-END ROS 2 DATA PIPELINE</div>
+        <h2>Robot System Architecture & Data Flow</h2>
+        <p>Complete data pipeline from physical & CARLA simulated sensors to EKF, LiDAR preprocessor, sensor fusion, tracking, trajectory prediction, dynamic costmaps, Nav2, and motor actuation.</p>
       </div>
-      <div class="pipeline-mode-note"><span class="pulse-indicator"></span> Architecture view <span>CARLA / hardware variants</span></div>
+      <div class="pipeline-mode-note"><span class="pulse-indicator"></span> AlgoMaster Graph <span>Top-to-Bottom Flow • Continuous Topics</span></div>
     </div>
   </section>
 
-  <!-- Horizontal Pipeline Navigation Controls -->
-  <section class="pipeline-heading">
-    <div>
-      <h3>End-to-end flow <span id="pipeline-stage-count"></span></h3>
-      <p>Scroll sideways to follow the graph. Topic labels show the documented handoff between stages.</p>
-    </div>
-
-    <!-- Scroll Arrows -->
-    <div class="flex items-center gap-2">
-      <button id="scroll-left" class="p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors" title="Scroll Left">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-      </button>
-      <button id="scroll-right" class="p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors" title="Scroll Right">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-      </button>
-    </div>
+  <!-- VIEW 1: AlgoMaster Top-to-Bottom Giant Graph (Default Mode) -->
+  <section class="algomaster-graph-section px-4 md:px-6 py-6" id="algomaster-view-container" aria-label="AlgoMaster Top-to-Bottom Graph">
+    <div id="algomaster-pipeline-graph"></div>
   </section>
 
-  <!-- Full ROS node/topic graph: a single left-to-right architecture view -->
-  <section class="whole-graph-shell" aria-label="Complete ROS node and topic graph">
-    <div id="whole-pipeline-graph"></div>
-  </section>
+  <!-- VIEW 2: Horizontal Flow & Expanded Detail Track (Hidden by default, toggled via switcher) -->
+  <div id="horizontal-view-container" style="display: none;">
+    <!-- Horizontal Pipeline Heading -->
+    <section class="pipeline-heading px-6">
+      <div>
+        <h3>Horizontal Flow Track <span id="pipeline-stage-count"></span></h3>
+        <p>Scroll sideways to follow the stages. Click any card to inspect its inputs, nodes, outputs, and sub-steps.</p>
+      </div>
 
-  <!-- Horizontal Stage Track and expanded stage graph -->
-  <main class="pipeline-shell">
-    <div class="pipeline-track" id="pipeline-track" aria-label="Horizontal robot data pipeline graph"></div>
-    <section id="stage-detail-container" aria-live="polite" aria-label="Selected stage data flow"></section>
-  </main>
+      <!-- Scroll Arrows -->
+      <div class="flex items-center gap-2">
+        <button id="scroll-left" class="p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors" title="Scroll Left">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <button id="scroll-right" class="p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors" title="Scroll Right">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- Horizontal Whole Graph Shell -->
+    <section class="whole-graph-shell" aria-label="Complete ROS node and topic graph">
+      <div id="whole-pipeline-graph"></div>
+    </section>
+
+    <!-- Horizontal Stage Track and expanded stage graph -->
+    <main class="pipeline-shell">
+      <div class="pipeline-track" id="pipeline-track" aria-label="Horizontal robot data pipeline graph"></div>
+    </main>
+  </div>
+
+  <!-- Shared Stage Detail Drawer / Bottom Section -->
+  <section class="max-w-7xl mx-auto w-full px-4 md:px-6 py-8" id="stage-detail-wrapper">
+    <div id="stage-detail-container" aria-live="polite" aria-label="Selected stage data flow"></div>
+  </section>
 
   <!-- Footer -->
-  <footer class="border-t border-slate-800/80 bg-slate-950 py-8 px-6 text-center text-xs font-mono text-slate-400">
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-8 px-6 text-center text-xs font-mono text-slate-400 mt-auto">
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
       <div>
         Project Perceptron • Autonomous Ground Vehicle Systems

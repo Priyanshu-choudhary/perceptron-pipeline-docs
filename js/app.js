@@ -3,6 +3,7 @@
 import { PIPELINE_STAGES, PIPELINE_TOPIC_CONNECTIONS } from './pipeline-data.js';
 import { mountStageStory } from './visualizers/stage-story.js';
 import { mountWholeGraph } from './visualizers/whole-graph.js';
+import { mountAlgoMasterGraph } from './visualizers/algomaster-graph.js';
 
 const REPOSITORY = 'https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local';
 
@@ -10,18 +11,74 @@ class PipelineDocsApp {
   constructor() {
     this.activeStage = PIPELINE_STAGES[0];
     this.activeStory = null;
-    this.wholeGraph = mountWholeGraph(document.getElementById('whole-pipeline-graph'), PIPELINE_STAGES, PIPELINE_TOPIC_CONNECTIONS, stage => this.selectStageById(stage.id, false));
+    this.currentViewMode = 'algomaster'; // 'algomaster' or 'horizontal'
+
+    // Mount Top-to-Bottom AlgoMaster Graph
+    this.algoGraph = mountAlgoMasterGraph(
+      document.getElementById('algomaster-pipeline-graph'),
+      PIPELINE_STAGES,
+      PIPELINE_TOPIC_CONNECTIONS,
+      stage => this.selectStageById(stage.id, true)
+    );
+    this.algoGraph?.setActiveStage(this.activeStage.id);
+
+    // Mount Horizontal Whole Graph
+    this.wholeGraph = mountWholeGraph(
+      document.getElementById('whole-pipeline-graph'),
+      PIPELINE_STAGES,
+      PIPELINE_TOPIC_CONNECTIONS,
+      stage => this.selectStageById(stage.id, false)
+    );
     this.wholeGraph?.setActiveStage(this.activeStage.id);
+
     this.renderPipelineTrack();
     this.setupScrollControls();
+    this.setupViewModeSwitcher();
     this.renderStageDetail(this.activeStage);
+  }
+
+  setupViewModeSwitcher() {
+    const btnAlgo = document.getElementById('view-mode-algomaster');
+    const btnHori = document.getElementById('view-mode-horizontal');
+    const containerAlgo = document.getElementById('algomaster-view-container');
+    const containerHori = document.getElementById('horizontal-view-container');
+
+    const setMode = (mode) => {
+      this.currentViewMode = mode;
+      if (mode === 'algomaster') {
+        btnAlgo?.classList.add('is-active');
+        btnAlgo?.setAttribute('aria-selected', 'true');
+        btnHori?.classList.remove('is-active');
+        btnHori?.setAttribute('aria-selected', 'false');
+
+        if (containerAlgo) containerAlgo.style.display = 'block';
+        if (containerHori) containerHori.style.display = 'none';
+
+        // Trigger redraw so wires calculate exact positions
+        window.dispatchEvent(new Event('resize'));
+      } else {
+        btnHori?.classList.add('is-active');
+        btnHori?.setAttribute('aria-selected', 'true');
+        btnAlgo?.classList.remove('is-active');
+        btnAlgo?.setAttribute('aria-selected', 'false');
+
+        if (containerAlgo) containerAlgo.style.display = 'none';
+        if (containerHori) containerHori.style.display = 'block';
+
+        // Trigger resize for horizontal graph
+        window.dispatchEvent(new Event('resize'));
+      }
+    };
+
+    btnAlgo?.addEventListener('click', () => setMode('algomaster'));
+    btnHori?.addEventListener('click', () => setMode('horizontal'));
   }
 
   renderPipelineTrack() {
     const track = document.getElementById('pipeline-track');
     const count = document.getElementById('pipeline-stage-count');
     if (!track) return;
-    if (count) count.textContent = `· ${PIPELINE_STAGES.length} stages`;
+    if (count) count.textContent = `• ${PIPELINE_STAGES.length} stages`;
 
     track.innerHTML = PIPELINE_STAGES.map((stage, index) => {
       const outgoing = PIPELINE_TOPIC_CONNECTIONS.filter(edge => edge.fromStage === stage.num);
@@ -34,9 +91,9 @@ class PipelineDocsApp {
             <span class="stage-title">${stage.title}</span>
             <span class="stage-meta">${stage.nodes.length} node${stage.nodes.length === 1 ? '' : 's'} <i></i> ${stage.subSteps.length} steps</span>
             ${primaryTopic ? `<span class="stage-output-preview"><span>OUTPUT</span><code>${primaryTopic.topic}</code></span>` : ''}
-            <span class="stage-open">${stage.id === this.activeStage.id ? 'Expanded ↓' : 'Open stage →'}</span>
+            <span class="stage-open">${stage.id === this.activeStage.id ? 'Expanded ↗' : 'Open stage ↗'}</span>
           </button>
-          <div class="stage-wire ${connectsToNext ? 'is-wired' : 'is-gap'}" aria-hidden="true">${connectsToNext ? '<span></span><b>›</b>' : '<span></span>'}</div>
+          <div class="stage-wire ${connectsToNext ? 'is-wired' : 'is-gap'}" aria-hidden="true">${connectsToNext ? '<span></span><b>▶</b>' : '<span></span>'}</div>
           ${outgoing.length ? `<div class="stage-links" aria-label="Documented connections from stage ${stage.num}">${outgoing.map(edge => `<span><b>${String(edge.toStage).padStart(2, '0')}</b><code>${edge.topic}</code></span>`).join('')}</div>` : '<div class="stage-links stage-links-empty">No outgoing connection listed</div>'}
           ${index === PIPELINE_STAGES.length - 1 ? '<div class="pipeline-end">END OF DOCUMENTED FLOW</div>' : ''}
         </div>`;
@@ -49,14 +106,18 @@ class PipelineDocsApp {
     document.getElementById('scroll-right')?.addEventListener('click', () => track?.scrollBy({ left: 520, behavior: 'smooth' }));
   }
 
-  selectStageById(id, scrollToCard = true) {
+  selectStageById(id, scrollToDetail = true) {
     const stage = PIPELINE_STAGES.find(item => item.id === id);
     if (!stage) return;
     this.activeStage = stage;
+    this.algoGraph?.setActiveStage(stage.id);
     this.wholeGraph?.setActiveStage(stage.id);
     this.renderPipelineTrack();
     this.renderStageDetail(stage);
-    if (scrollToCard) document.getElementById(`card-${stage.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
+    if (scrollToDetail) {
+      document.getElementById('stage-detail-wrapper')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   renderStageDetail(stage) {
@@ -70,7 +131,7 @@ class PipelineDocsApp {
     const nodes = stage.nodes?.length ? stage.nodes.map(node => `
       <article class="flow-item node-item"><span class="flow-item-kind">${node.type || 'Processing node'}</span><h5>${node.name}</h5><p>${node.role || ''}</p>${node.file ? `<a href="${REPOSITORY}/blob/feature/carla-sim-perception/${node.file}" target="_blank" rel="noreferrer">Open source file ↗</a>` : ''}</article>`).join('') : '<p class="flow-empty">No nodes listed for this stage.</p>';
     const outputs = stage.outputs?.length ? stage.outputs.map(output => `
-      <article class="flow-item output-item"><span class="flow-item-kind">PUBLISHED DATA</span><h5><code>${output.topic}</code></h5><p>${output.type || 'Message type not listed'}</p><div class="output-meta"><span>FROM · ${output.publisher || 'Publisher not mapped'}</span><span>RATE · ${output.rate || 'Not listed'}</span><span>TO · ${output.target || 'Receiver not mapped'}</span></div></article>`).join('') : '<p class="flow-empty">No outputs listed for this stage.</p>';
+      <article class="flow-item output-item"><span class="flow-item-kind">PUBLISHED DATA</span><h5><code>${output.topic}</code></h5><p>${output.type || 'Message type not listed'}</p><div class="output-meta"><span>FROM • ${output.publisher || 'Publisher not mapped'}</span><span>RATE • ${output.rate || 'Not listed'}</span><span>TO • ${output.target || 'Receiver not mapped'}</span></div></article>`).join('') : '<p class="flow-empty">No outputs listed for this stage.</p>';
     const steps = stage.subSteps?.map((step, index) => `
       <article class="step-node"><span class="step-number">${step.step}</span><div><h5>${step.title}</h5><p>${step.desc}</p><div class="step-foot"><span>FRAME <b>${step.frame || 'Not listed'}</b></span><span>RATE <b>${step.rate || 'Not listed'}</b></span></div></div>${index < stage.subSteps.length - 1 ? '<span class="step-arrow" aria-hidden="true">→</span>' : ''}</article>`).join('') || '<p class="flow-empty">No processing steps listed.</p>';
     const connections = PIPELINE_TOPIC_CONNECTIONS.filter(edge => edge.fromStage === stage.num || edge.toStage === stage.num);
@@ -78,14 +139,14 @@ class PipelineDocsApp {
 
     container.innerHTML = `
       <div class="expanded-stage" style="--stage-accent:${stage.color};--stage-glow:${stage.bgGlow}">
-        <header class="expanded-header"><div><div class="expanded-kicker">STAGE ${String(stage.num).padStart(2, '0')} <span>·</span> ${stage.badge}</div><h2>${stage.title}</h2><p>${stage.summary}</p></div></header>
+        <header class="expanded-header"><div><div class="expanded-kicker">STAGE ${String(stage.num).padStart(2, '0')} <span>•</span> ${stage.badge}</div><h2>${stage.title}</h2><p>${stage.summary}</p></div></header>
         <div class="stage-story-mount" id="stage-story-mount"></div>
         <div class="flow-graph" aria-label="Inputs flow through nodes to outputs">
           <section class="flow-lane"><div class="lane-heading"><span>01</span><div><b>INPUTS</b><small>What enters this stage</small></div></div><div class="lane-items">${inputs}</div></section>
-          <div class="lane-connector" aria-hidden="true"><span></span><b>›</b></div>
+          <div class="lane-connector" aria-hidden="true"><span></span><b>▶</b></div>
           <section class="flow-lane"><div class="lane-heading"><span>02</span><div><b>NODES / MODULES</b><small>Who handles the data</small></div></div><div class="lane-items">${nodes}</div></section>
-          <div class="lane-connector" aria-hidden="true"><span></span><b>›</b></div>
-          <section class="flow-lane"><div class="lane-heading"><span>03</span><div><b>OUTPUTS</b><small>Topic · type · rate · target</small></div></div><div class="lane-items">${outputs}</div></section>
+          <div class="lane-connector" aria-hidden="true"><span></span><b>▶</b></div>
+          <section class="flow-lane"><div class="lane-heading"><span>03</span><div><b>OUTPUTS</b><small>Topic • type • rate • target</small></div></div><div class="lane-items">${outputs}</div></section>
         </div>
         <section class="substeps-section"><div class="section-heading"><div><span class="section-index">04</span><h3>Inside this stage</h3></div><span>${stage.subSteps.length} documented steps</span></div><div class="steps-flow">${steps}</div></section>
         <details class="connections-details"><summary>Show connected stage handoffs <span>${connections.length} listed links</span></summary><div class="connections-list">${edges}</div></details>
@@ -98,7 +159,6 @@ class PipelineDocsApp {
   escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   }
-
 }
 
 window.addEventListener('DOMContentLoaded', () => {

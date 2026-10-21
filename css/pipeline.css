@@ -391,3 +391,251 @@ body { background: #080d15; color: #e5edf5; overflow-x: hidden; }
 .wire-source { fill: #09121b; stroke: var(--wire-color); stroke-width: 2; }.wire-target { fill: var(--wire-color); stroke: #ddfff8; stroke-width: 1; }.wire-packet { fill: #e5fffa; stroke: var(--wire-color); stroke-width: 2; filter: drop-shadow(0 0 5px var(--wire-color)); }
 .whole-graph-canvas.flow-paused .wire-path { stroke-opacity: .58; }.whole-graph-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; padding: 12px 20px; border-top: 1px solid #21313e; color: #8799a7; font: 9px var(--font-mono); }.whole-graph-legend span { display: inline-flex; align-items: center; gap: 6px; }.whole-graph-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }.legend-node { background: #47687d; }.legend-in { background: #67bfe5; }.legend-out { background: #5de0bd; }.legend-flow { width: 18px !important; height: 2px !important; background: #5acdbd; }.whole-graph-legend small { margin-left: auto; color: #647887; font-size: 8px; }
 @media (max-width: 760px) { .whole-graph-shell { padding: 10px 18px 18px; }.whole-graph-toolbar { align-items: flex-start; flex-direction: column; }.whole-graph-actions { width: 100%; }.whole-graph-actions button { flex: 1; }.whole-graph-scroll { height: 78vh; max-height: none; min-height: 600px; }.whole-graph-legend small { width: 100%; margin: 0; } }
+
+/* ==========================================================================
+   AlgoMaster Top-to-Bottom Giant Graph Styles
+   ========================================================================== */
+
+.algomaster-shell {
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  background: #030712;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 229, 255, 0.1);
+  overflow: hidden;
+  position: relative;
+}
+
+.algomaster-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  background: linear-gradient(180deg, #0b1526, #070e1b);
+  border-bottom: 1px solid #1e293b;
+}
+
+.algomaster-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.algomaster-viewport {
+  width: 100%;
+  max-height: 85vh;
+  min-height: 720px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: #040814;
+  background-image: 
+    linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  position: relative;
+  scrollbar-color: #1e293b #040814;
+  scrollbar-width: thin;
+}
+
+.algomaster-canvas {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  isolation: isolate;
+}
+
+.algomaster-svg-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.algomaster-tiers {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 56px;
+  padding: 40px 20px 80px;
+  width: 100%;
+}
+
+/* AlgoMaster Card Container */
+.algomaster-card {
+  width: 100%;
+  max-width: 720px;
+  background: #081220;
+  border: 2px solid var(--stage-accent, #00e5ff);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 24px color-mix(in srgb, var(--stage-accent, #00e5ff) 25%, transparent);
+  transition: all 0.25s ease;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.algomaster-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7), 0 0 35px color-mix(in srgb, var(--stage-accent, #00e5ff) 40%, transparent);
+}
+
+.algomaster-card.is-active {
+  border-width: 2.5px;
+  box-shadow: 0 0 45px color-mix(in srgb, var(--stage-accent, #00e5ff) 50%, transparent);
+}
+
+.algomaster-card-header {
+  padding: 12px 18px;
+  background: #0a1728;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.algomaster-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.algomaster-nodes-container {
+  padding: 16px 20px 12px;
+}
+
+/* AlgoMaster Node Capsule Pill */
+.algomaster-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: #0d1e34;
+  border: 1.5px solid var(--stage-accent, #00e5ff);
+  border-radius: 9999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 10px color-mix(in srgb, var(--stage-accent, #00e5ff) 15%, transparent);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.algomaster-pill:hover {
+  background: #112745;
+  transform: scale(1.04);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), 0 0 18px color-mix(in srgb, var(--stage-accent, #00e5ff) 40%, transparent);
+}
+
+.algomaster-pill.is-selected {
+  background: color-mix(in srgb, var(--stage-accent, #00e5ff) 20%, #0d1e34);
+  border-color: #ffffff;
+  box-shadow: 0 0 20px var(--stage-accent, #00e5ff);
+}
+
+.algomaster-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.algomaster-topic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+}
+
+/* AlgoMaster Caption at Card Bottom */
+.algomaster-card-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #060e1a;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+/* AlgoMaster Animated Glowing Wires & Beads */
+.algomaster-wire-group {
+  pointer-events: none;
+}
+
+.algomaster-wire-glow {
+  fill: none;
+  stroke-width: 4px;
+  stroke-opacity: 0.35;
+  filter: url(#algoGlow);
+}
+
+.algomaster-wire-core {
+  fill: none;
+  stroke-width: 1.8px;
+  stroke-opacity: 0.85;
+}
+
+.algomaster-animated-bead {
+  filter: drop-shadow(0 0 8px #00e5ff) drop-shadow(0 0 14px #00e5ff);
+}
+
+.algomaster-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 24px;
+  background: #070e1b;
+  border-top: 1px solid #1e293b;
+}
+
+/* View Mode Switcher Pill in Top Bar */
+.view-mode-pill {
+  display: flex;
+  align-items: center;
+  background: #09121d;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.view-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 7px;
+  color: #94a3b8;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-mode-btn:hover {
+  color: #ffffff;
+}
+
+.view-mode-btn.is-active {
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.15);
+}
