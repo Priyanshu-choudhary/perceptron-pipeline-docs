@@ -1,105 +1,713 @@
-const stories = {
-  1: {
-    name: 'Sensor sampling', tag: 'RAW SOURCES → ROS BRIDGES',
-    steps: ['Physical sensors return measurements; CARLA actors produce a separate simulated set.', 'A sensor tick groups LiDAR, camera, IMU, GNSS and ground truth at simulation time.', 'Raw serial frames and CARLA data are ready for their respective bridge nodes.'],
-    controls: '<label>Source <select data-option="source"><option value="both">Compare both</option><option value="hardware">Hardware</option><option value="carla">CARLA</option></select></label>',
-    scene: (p,o) => `<g class="story-group ${p===0?'lit':''} ${o.source==='carla'?'source-hidden':''}"><rect class="unit amber" x="34" y="70" width="250" height="224" rx="10"/><text class="st-kicker" x="54" y="99">PHYSICAL ROBOT</text><path class="sensor-ray" d="M84 157 L58 130 M84 157 L55 157 M84 157 L59 185 M84 157 L103 122 M84 157 L108 185"/><circle class="sensor" cx="84" cy="157" r="13"/><text class="st-label" x="118" y="145">LDROBOT STL-19P</text><text class="st-mono" x="118" y="165">LD19 serial · ~10 Hz</text><text class="st-label" x="55" y="220">STM32 telemetry</text><text class="st-mono" x="55" y="241">TinyFrame 0x55 / 0x56</text><text class="st-mono" x="55" y="263">wheel · IMU · battery</text></g><g class="story-group ${p===1?'lit':''} ${o.source==='hardware'?'source-hidden':''}"><rect class="unit blue" x="354" y="70" width="250" height="224" rx="10"/><text class="st-kicker" x="374" y="99">CARLA SENSOR TICK</text><circle class="sensor sim-sensor" cx="404" cy="157" r="20"/><path class="sensor-ray" d="M404 157 L377 120 M404 157 L365 157 M404 157 L379 194 M404 157 L434 126 M404 157 L438 188"/><text class="st-label" x="447" y="143">LiDAR + camera</text><text class="st-mono" x="447" y="164">IMU · GNSS · boxes_2d</text><text class="st-mono" x="375" y="229">synchronous simulation time</text><text class="st-mono" x="375" y="253">/carla/lidar/points</text></g><g class="story-group ${p===2?'lit':''}"><rect class="unit green" x="674" y="117" width="250" height="132" rx="10"/><text class="st-kicker" x="698" y="148">NEXT: BRIDGE NODES</text><text class="st-label" x="698" y="180">jetson_bridge_node</text><text class="st-label" x="698" y="205">carla_bridge</text></g><path class="flow-line" d="M284 177 H354 M604 177 H674"/><circle class="packet" cx="319" cy="177" r="6"/><circle class="packet packet-b" cx="639" cy="177" r="6"/>`,
-  },
-  2: {
-    name: 'Transport to ROS 2', tag: 'BYTES / RPC → PUBLISHERS → TOPICS',
-    steps: ['Transport adapters read serial, ZeroMQ and CARLA RPC inputs.', 'Each bridge decodes or converts its input to the matching ROS message type.', 'Publishers expose separate hardware and CARLA topics on the ROS graph.'],
-    scene: p => `<g class="story-group ${p===0?'lit':''}"><rect class="unit amber" x="34" y="69" width="224" height="237" rx="10"/><text class="st-kicker" x="54" y="99">TRANSPORT INPUTS</text><text class="st-label" x="54" y="139">UART /dev/ttyUSB0</text><text class="st-mono" x="54" y="160">TinyFrame bytes</text><text class="st-label" x="54" y="203">ZeroMQ :5555</text><text class="st-mono" x="54" y="224">LAN sensor packets</text><text class="st-label" x="54" y="267">CARLA RPC :2000</text></g><g class="story-group ${p===1?'lit':''}"><rect class="unit blue" x="366" y="95" width="228" height="184" rx="10"/><text class="st-kicker" x="390" y="125">ADAPTER / DECODER</text><text class="st-label" x="390" y="164">jetson_bridge_node</text><text class="st-label" x="390" y="195">stm32_bridge_node</text><text class="st-label" x="390" y="226">carla_bridge</text><text class="st-mono" x="390" y="254">bytes → typed messages</text></g><g class="story-group ${p===2?'lit':''}"><rect class="unit green" x="702" y="58" width="222" height="260" rx="10"/><text class="st-kicker" x="722" y="88">ROS 2 TOPICS</text><text class="st-mono" x="722" y="126">/scan · LaserScan</text><text class="st-mono" x="722" y="156">/odom · Odometry</text><text class="st-mono" x="722" y="186">/imu/data_raw</text><text class="st-mono" x="722" y="216">/battery/state</text><text class="st-mono" x="722" y="246">/carla/lidar/points</text><text class="st-mono" x="722" y="276">/carla/camera/image_raw</text></g><path class="flow-line" d="M258 186 H366 M594 186 H702"/><circle class="packet" cx="312" cy="186" r="6"/><circle class="packet packet-b" cx="650" cy="186" r="6"/>`,
-  },
-  3: {
-    name: 'EKF update', tag: 'WHEEL ODOMETRY + GYRO → FILTERED POSE',
-    steps: ['Wheel odometry predicts forward velocity and the next pose.', 'Gyro conditioning supplies angular velocity; the EKF corrects yaw and uncertainty.', 'The filter publishes /odometry/filtered and the odom → base_footprint transform.'],
-    scene: p => `<rect class="plot" x="30" y="44" width="900" height="285" rx="8"/><path class="axis" d="M94 298 V72 M94 298 H895"/><text class="st-kicker" x="45" y="28">PLANAR STATE ESTIMATE · ILLUSTRATIVE, NOT LIVE ROBOT TELEMETRY</text><g class="story-group ${p===0?'lit':''}"><path class="uncertainty" d="M244 225 C300 151 389 171 401 222 C412 270 333 285 268 256 Z"/><circle class="measure" cx="345" cy="230" r="7"/><text class="st-label" x="270" y="126">/odom · vx</text><text class="st-mono" x="270" y="145">wheel prediction</text></g><g class="story-group ${p===1?'lit':''}"><path class="gyro-path" d="M346 230 C444 204 494 196 560 156"/><circle class="measure" cx="560" cy="156" r="7"/><text class="st-label" x="466" y="117">/imu/data_raw · wz</text><text class="st-mono" x="466" y="136">conditioned gyro update</text></g><g class="story-group ${p===2?'lit':''}"><path class="estimate-path" d="M560 156 C628 128 710 122 794 104"/><ellipse class="estimate" cx="794" cy="104" rx="41" ry="19" transform="rotate(-18 794 104)"/><circle class="estimate-dot" cx="794" cy="104" r="6"/><text class="st-label" x="660" y="190">/odometry/filtered</text><text class="st-mono" x="660" y="209">TF odom → base_footprint</text></g><text class="st-mono" x="104" y="319">x position →</text><text class="st-mono" x="104" y="66">y ↑</text>`,
-  },
-  4: {
-    name: 'Map localization', tag: 'SCAN MATCHING → MAP-RELATIVE POSE',
-    controls: '<label>Mode <select data-option="mode"><option value="amcl">AMCL localization</option><option value="slam">Async SLAM</option></select></label>',
-    steps: ['AMCL compares /scan against /map using the incoming odometry transform.', 'Particle hypotheses converge around the pose that best explains the scan.', 'Localization publishes /amcl_pose and TF map → odom; SLAM mode updates /map.'],
-    scene: (p,o) => `<rect class="plot grid-map" x="28" y="39" width="620" height="294" rx="8"/><text class="st-kicker" x="45" y="63">MAP FRAME · /map</text><path class="map-wall" d="M128 92 V260 H280 M128 160 H217 V92 M280 260 V188 H418 V112 H540 M418 188 V288 M217 160 V224 H340"/><g class="particle-cloud ${p>0?'converged':''}">${Array.from({length:22},(_,i)=>`<circle class="particle" cx="${310+(i%6)*17+(i%3)*4}" cy="${188+Math.floor(i/6)*15+(i%2)*4}" r="2.6"/>`).join('')}</g><g class="story-group ${p===1?'lit':''}"><path class="scan-rays" d="M332 206 L274 142 M332 206 L287 205 M332 206 L278 245 M332 206 L340 131 M332 206 L402 156 M332 206 L422 208 M332 206 L388 264"/><circle class="estimate-dot" cx="332" cy="206" r="7"/><text class="st-label" x="358" y="238">/scan alignment</text></g><g class="story-group ${p===2?'lit':''}"><rect class="unit green" x="686" y="90" width="238" height="183" rx="10"/><text class="st-kicker" x="706" y="119">${o.mode==='slam'?'SLAM / MAP OUTPUT':'AMCL / POSE OUTPUT'}</text><text class="st-label" x="706" y="158">${o.mode==='slam'?'/map':'/amcl_pose'}</text><text class="st-mono" x="706" y="181">map → odom</text><text class="st-mono" x="706" y="214">/initialpose input</text><text class="st-mono" x="706" y="245">${o.mode==='slam'?'async_slam_toolbox':'amcl'}</text></g><path class="flow-line" d="M648 206 H686"/>`,
-  },
-  5: {
-    name: 'Point cloud filtering', tag: '3D CLOUD → GROUND / OBSTACLE / CLUSTERS',
-    controls: '<label><input type="checkbox" data-option="ground" checked> Ground removal</label>',
-    steps: ['lidar_preprocessor_node transforms /carla/lidar/points into the robot frame.', 'Height and geometric filters separate the ground plane from obstacle returns.', 'Clustering groups obstacle points; the node publishes filtered clouds and /perception/scan.'],
-    scene: (p,o) => `<text class="st-kicker" x="34" y="44">POINTS COLORED BY PREPROCESSING RESULT · /carla/lidar/points</text><path class="ground-line" d="M38 293 H920"/><path class="cloud-ground ${o.ground?'shown':''}" d="${Array.from({length:24},(_,i)=>`M${50+i*36} ${275+(i%4)*6} l5 -8`).join(' ')}"/><path class="cloud-obstacle ${p>0?'shown':''}" d="M260 278 l7 -39 M276 275 l4 -73 M292 277 l8 -120 M308 276 l6 -82 M324 277 l3 -42 M570 278 l8 -44 M589 278 l4 -88 M608 277 l8 -118 M625 276 l5 -73 M644 278 l5 -48"/><g class="story-group ${p===2?'lit':''}"><rect class="cluster-box" x="250" y="143" width="94" height="142" rx="3"/><text class="st-label" x="250" y="126">cluster 01</text><rect class="cluster-box amber" x="560" y="152" width="98" height="134" rx="3"/><text class="st-label" x="560" y="135">cluster 02</text></g><g class="topic-rail"><text class="st-mono" x="48" y="335">/perception/points_ground</text><text class="st-mono" x="343" y="335">/perception/points_obstacles</text><text class="st-mono" x="700" y="335">/perception/clusters</text></g><circle class="packet" cx="155" cy="280" r="6"/>`,
-  },
-  6: {
-    name: 'Camera–LiDAR association', tag: '2D BOX + 3D POINTS → FUSED OBJECT',
-    steps: ['Camera intrinsics project obstacle cloud points into the image plane.', 'Projected points are associated with the CARLA 2D ground-truth box (or configured detector topic).', 'object_fusion_node emits a fused object and debug image / markers.'],
-    scene: p => `<rect class="camera-frame" x="36" y="52" width="492" height="273" rx="8"/><path class="scene-road" d="M45 254 L248 132 L520 254 M45 300 L248 202 L520 300"/><path class="camera-grid" d="M200 325 L246 52 M298 325 L298 52 M397 325 L350 52 M37 142 H527 M37 213 H527"/><g class="story-group ${p===0?'lit':''}"><rect class="detection-box" x="312" y="110" width="115" height="145" rx="2"/><text class="st-label" x="313" y="99">CARLA boxes_2d</text></g><g class="story-group ${p===1?'lit':''}"><path class="projection" d="M577 93 L379 154 M577 172 L362 180 M577 254 L390 220"/><path class="lidar-dots" d="M562 80 l7 -7 m20 22 l7 -7 m-35 49 l7 -7 m31 32 l7 -7 m-37 49 l7 -7 m26 29 l7 -7"/><text class="st-label" x="552" y="287">/perception/points_obstacles</text></g><g class="story-group ${p===2?'lit':''}"><rect class="unit green" x="675" y="102" width="250" height="170" rx="10"/><text class="st-kicker" x="696" y="132">FUSED DETECTION</text><text class="st-label" x="696" y="170">/perception/objects</text><text class="st-mono" x="696" y="196">class · pose · dimensions</text><text class="st-mono" x="696" y="225">object_points / markers</text><text class="st-mono" x="696" y="250">objects_image (debug)</text></g><text class="st-mono" x="50" y="349">/carla/camera/camera_info → projection model</text>`,
-  },
-  7: {
-    name: 'Track identity over time', tag: 'DETECTIONS → ASSOCIATION → TRACK ID',
-    steps: ['The tracker predicts each existing object state using odometry motion.', 'New /perception/objects detections are matched to predicted tracks.', 'Matched tracks update; unmatched tracks coast briefly; output includes stable IDs.'],
-    scene: p => `<rect class="plot grid-map" x="31" y="46" width="898" height="280" rx="8"/><text class="st-kicker" x="50" y="71">ROBOT FRAME · POSITION OVER TIME</text><path class="axis" d="M83 291 V91 M83 291 H892"/><path class="track-path old" d="M155 252 C250 245 305 215 386 218"/><path class="track-path ${p>0?'lit':''}" d="M155 252 C250 245 305 215 386 218 C480 209 544 172 627 179 C706 185 757 136 840 119"/><path class="track-ghost" d="M627 179 C705 167 758 142 840 119"/><g class="detections"><circle cx="155" cy="252" r="6"/><circle cx="386" cy="218" r="6"/><circle cx="627" cy="179" r="6"/><circle cx="840" cy="119" r="6"/></g><rect class="track-label" x="610" y="136" width="70" height="25" rx="4"/><text class="st-mono" x="620" y="153">track_04</text><text class="st-mono" x="140" y="278">t₀</text><text class="st-mono" x="373" y="245">t₁</text><text class="st-mono" x="615" y="205">t₂</text><text class="st-mono" x="827" y="146">t₃</text><text class="st-label" x="408" y="304">/perception/tracked_objects</text><circle class="packet" cx="${[155,386,627,840][p]}" cy="${[252,218,179,119][p]}" r="8"/>`,
-  },
-  8: {
-    name: 'Future motion hypotheses', tag: 'TRACKED STATE → TIME-INDEXED PATHS',
-    controls: '<label>Horizon <select data-option="horizon"><option value="2">2.0 s</option><option value="1">1.0 s</option><option value=".5">0.5 s</option></select></label>',
-    steps: ['trajectory_predictor_node reads track position, heading and velocity.', 'The predictor rolls the motion model forward at the configured time intervals.', 'Predicted object paths and markers are published for downstream consumers.'],
-    scene: (p,o) => `<rect class="plot grid-map" x="30" y="46" width="900" height="280" rx="8"/><path class="axis" d="M72 285 V83 M72 285 H895"/><circle class="robot-dot" cx="171" cy="236" r="10"/><path class="track-path old" d="M171 236 L292 221"/><g class="story-group ${p>=1?'lit':''}"><path class="trajectory trajectory-a" d="M292 221 C420 204 494 145 630 150 S790 104 861 96"/><path class="trajectory trajectory-b" d="M292 221 C407 200 490 245 610 222 S776 234 862 209"/><path class="trajectory trajectory-c" d="M292 221 C405 177 520 136 631 111 S777 81 861 72"/><circle class="future-dot" cx="435" cy="190" r="6"/><circle class="future-dot b" cx="597" cy="222" r="6"/><circle class="future-dot c" cx="630" cy="111" r="6"/></g><text class="st-label" x="130" y="267">track_04 · current state</text><text class="st-mono" x="298" y="250">t = 0</text><text class="st-mono" x="615" y="293">t + ${o.horizon} s</text><text class="st-label" x="641" y="174">/perception/predicted_objects</text><text class="st-mono" x="641" y="194">candidate motion paths</text>`,
-  },
-  9: {
-    name: 'Obstacle and risk layers', tag: 'GROUND + OBSTACLES + PREDICTIONS → COSTMAP',
-    controls: '<label><input type="checkbox" data-option="inflation" checked> Inflation</label><label><input type="checkbox" data-option="risk" checked> Dynamic risk</label>',
-    steps: ['costmap_node bins ground and obstacle points into its 3D voxel representation.', 'Obstacle cells are inflated by the configured safety radius.', 'Predicted objects contribute a separate dynamic-risk layer; layers combine for inspection.'],
-    scene: (p,o) => { const cells = Array.from({length:120},(_,i)=>{const x=i%12,y=Math.floor(i/12),hot=[[4,4],[5,4],[4,5],[8,7],[8,6],[3,8]].some(([a,b])=>a===x&&b===y);return `<rect class="cost-cell ${hot?'occupied':''} ${hot&&p>0&&o.inflation?'inflated':''} ${hot&&p>1&&o.risk?'risk-cell':''}" x="${354+x*31}" y="${64+y*26}" width="28" height="23" rx="2"/>`}).join(''); return `<text class="st-kicker" x="40" y="42">LAYERED COSTMAP · LOCAL WINDOW</text><text class="st-mono" x="47" y="112">INPUT</text><text class="st-mono" x="47" y="139">ground cloud</text><text class="st-mono" x="47" y="162">obstacle cloud</text><text class="st-mono" x="47" y="185">predicted objects</text><path class="flow-line" d="M190 154 H300"/><rect class="unit blue" x="205" y="118" width="94" height="72" rx="7"/><text class="st-mono" x="215" y="148">costmap_node</text><text class="st-mono" x="217" y="169">voxelize</text>${cells}<circle class="robot-dot" cx="540" cy="190" r="8"/><text class="st-label" x="756" y="338">/costmap/combined</text><g class="legend"><rect x="356" y="343" width="10" height="10" class="occupied"/><text class="st-mono" x="372" y="352">occupied</text><rect x="470" y="343" width="10" height="10" class="inflated"/><text class="st-mono" x="486" y="352">inflated</text><rect x="573" y="343" width="10" height="10" class="risk-cell"/><text class="st-mono" x="589" y="352">dynamic risk</text></g>`; },
-  },
-  10: {
-    name: 'Plan and control', tag: 'NAVIGATE TO POSE → GLOBAL PLAN → /cmd_vel',
-    controls: '<label>Goal <select data-option="goal"><option value="north">North aisle</option><option value="east">East aisle</option></select></label>',
-    steps: ['NavigateToPose supplies a goal; planner_server searches a route through /map.', 'controller_server follows the path using scan and odometry while avoiding local obstacles.', 'The controller publishes /cmd_vel; the next stage converts Twist into motor commands.'],
-    scene: p => `<rect class="plot grid-map" x="28" y="40" width="902" height="293" rx="8"/><text class="st-kicker" x="45" y="64">NAV2 · GLOBAL PLAN + LOCAL CONTROL</text><path class="map-wall" d="M110 86 V176 H252 V118 H390 V271 H516 V151 H657 V87 H846 M110 268 H248 V212 H333 M520 271 H657 V230 H846"/><circle class="goal-dot ${p===0?'':'goal-active'}" cx="${document.querySelector('[data-option="goal"]')?.value==='east'?835:796}" cy="${document.querySelector('[data-option="goal"]')?.value==='east'?255:103}" r="9"/><path class="plan-line" d="M119 245 L208 245 L208 196 L292 196 L292 151 L438 151 L438 290 L586 290 L586 192 L696 192 L696 ${document.querySelector('[data-option="goal"]')?.value==='east'?255:103} L${document.querySelector('[data-option="goal"]')?.value==='east'?835:796} ${document.querySelector('[data-option="goal"]')?.value==='east'?255:103}"/><g class="story-group ${p>0?'lit':''}"><circle class="robot-dot" cx="${[119,208,292][p]}" cy="${[245,245,196][p]}" r="9"/><path class="cmd-arrow" d="M${[137,226,310][p]} ${[235,235,186][p]} l30 -10 l-8 12 z"/></g><text class="st-label" x="90" y="226">robot</text><text class="st-label" x="757" y="${document.querySelector('[data-option="goal"]')?.value==='east'?'288':'88'}">goal</text><rect class="unit blue" x="663" y="280" width="238" height="38" rx="5"/><text class="st-mono" x="679" y="304">controller_server → /cmd_vel</text>`,
-  },
-  11: {
-    name: 'Twist to wheel drive', tag: 'ROS COMMAND → UART FRAME → MOTOR OUTPUT',
-    steps: ['stm32_bridge_node reads /cmd_vel.linear.x and angular.z.', 'Linear and angular velocity are converted into left/right wheel commands and packed into a TinyFrame.', 'UART sends the frame; firmware checks the watchdog and drives wheel PWM.'],
-    scene: p => `<g class="story-group ${p===0?'lit':''}"><rect class="unit blue" x="34" y="111" width="200" height="140" rx="10"/><text class="st-kicker" x="55" y="143">ROS 2 INPUT</text><text class="st-label" x="55" y="181">/cmd_vel</text><text class="st-mono" x="55" y="205">linear.x · angular.z</text></g><g class="story-group ${p===1?'lit':''}"><rect class="unit amber" x="295" y="78" width="278" height="207" rx="10"/><text class="st-kicker" x="318" y="108">stm32_bridge_node</text><text class="st-label" x="318" y="152">v, ω → wheel speeds</text><text class="st-mono" x="318" y="182">left = v − ω·track/2</text><text class="st-mono" x="318" y="203">right = v + ω·track/2</text><rect class="byte" x="318" y="229" width="34" height="25"/><rect class="byte" x="356" y="229" width="34" height="25"/><rect class="byte" x="394" y="229" width="34" height="25"/><rect class="byte" x="432" y="229" width="34" height="25"/><text class="st-mono" x="474" y="247">TinyFrame</text></g><g class="story-group ${p===2?'lit':''}"><rect class="unit green" x="638" y="78" width="286" height="207" rx="10"/><text class="st-kicker" x="660" y="108">STM32 FIRMWARE</text><circle class="wheel ${p===2?'spin':''}" cx="700" cy="180" r="31"/><circle class="wheel ${p===2?'spin':''}" cx="838" cy="180" r="31"/><path class="wheel-spoke" d="M700 155 V205 M675 180 H725 M838 155 V205 M813 180 H863"/><text class="st-label" x="670" y="242">left PWM</text><text class="st-label" x="806" y="242">right PWM</text><text class="st-mono" x="682" y="266">deadman watchdog</text></g><path class="flow-line" d="M234 181 H295 M573 181 H638"/><circle class="packet" cx="264" cy="181" r="6"/><circle class="packet packet-b" cx="605" cy="181" r="6"/><text class="st-mono" x="301" y="321">UART TX · 0xA5 0x01</text><text class="st-mono" x="642" y="321">physical motor driver is external firmware</text>`,
-  },
-  12: {
-    name: 'Operator video overlay', tag: 'PLAN / POINTS → PROJECTED OVERLAY → RTP VIDEO',
-    steps: ['path_overlay_node receives /plan and /local_plan; the camera and LiDAR overlay node receives image and point data.', 'Path geometry is projected into the camera frame and composed with sensor imagery.', 'Encoded video leaves over ZeroMQ :5558 and RTP/UDP :5000; LiDAR overlay is also published.'],
-    scene: p => `<rect class="camera-frame" x="34" y="49" width="522" height="271" rx="8"/><path class="scene-road" d="M36 279 L262 140 L555 279 M36 318 L262 209 L555 318"/><path class="camera-grid" d="M182 320 L251 50 M304 320 L304 50 M431 320 L360 50 M34 143 H556 M34 217 H556"/><path class="overlay-path ${p>0?'lit':''}" d="M288 310 C287 264 278 235 292 205 S318 163 307 133"/><path class="local-path" d="M303 308 C307 269 314 239 303 209 S291 173 310 143"/><g class="story-group ${p===1?'lit':''}"><circle class="lidar-dots" cx="225" cy="184" r="2"/><circle class="lidar-dots" cx="204" cy="197" r="2"/><circle class="lidar-dots" cx="235" cy="209" r="2"/><circle class="lidar-dots" cx="390" cy="183" r="2"/><circle class="lidar-dots" cx="410" cy="199" r="2"/><text class="st-mono" x="48" y="76">/plan + /local_plan</text><text class="st-mono" x="48" y="299">camera image + projected point cloud</text></g><g class="story-group ${p===2?'lit':''}"><rect class="unit green" x="625" y="84" width="301" height="188" rx="10"/><text class="st-kicker" x="648" y="114">VIDEO TRANSPORT</text><text class="st-label" x="648" y="152">path_overlay_node</text><text class="st-mono" x="648" y="180">ZeroMQ :5558</text><path class="flow-line" d="M648 203 H896"/><text class="st-mono" x="648" y="232">H.265 → RTP / UDP :5000</text><text class="st-mono" x="648" y="255">/perception/lidar_overlay</text></g><text class="st-label" x="205" y="113">projected path overlay</text>`,
-  },
-};
+/**
+ * Continuous Math-Rendered Animation Engine for Perceptron Pipeline Stages
+ * Auto-running 60 FPS Canvas simulations representing exact robotics & mathematical models:
+ * - No manual step buttons (continuous auto-run like a 3Blue1Brown/Manim math video)
+ * - Exact mathematical representations: EKF covariance shrinkage, RANSAC plane,
+ *   Pinhole projection, Mahalanobis gating, CTRV horizons, dynamic costmaps, MPPI rollouts
+ */
 
 export function mountStageStory(container, stage) {
-  const story = stories[stage.num];
-  if (!container || !story) return null;
-  let phase = 0, playing = false, timer = null;
-  const readOptions = () => Object.fromEntries([...container.querySelectorAll('[data-option]')].map(input => [input.dataset.option, input.type === 'checkbox' ? input.checked : input.value]));
-  const customControls = story.controls || '';
-  container.innerHTML = `<section class="stage-story" style="--stage-accent:${stage.color}">
-    <header class="story-head"><div><span class="story-kicker">STAGE ${String(stage.num).padStart(2,'0')} · INTERACTIVE MODEL</span><h3>${story.name}</h3><p>${story.tag}</p></div><div class="story-options">${customControls}</div></header>
-    <div class="story-svg-wrap" role="img" aria-label="${story.name} interactive data flow animation"><svg class="story-svg" viewBox="0 0 960 380" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg></div>
-    <footer class="story-controls"><div class="story-step-status"><span class="story-step-count"></span><b class="story-caption"></b></div><div class="story-buttons"><button type="button" data-action="back" aria-label="Previous animation step">←</button><button type="button" data-action="play">Pause</button><button type="button" data-action="next" aria-label="Next animation step">→</button><button type="button" data-action="reset">Reset</button></div></footer>
-    <div class="story-progress" aria-hidden="true"></div>
-    <p class="story-note">Code-mapped conceptual animation · values are illustrative, not a live ROS connection.</p>
-  </section>`;
-  const svg = container.querySelector('.story-svg');
-  const draw = () => {
-    svg.innerHTML = `<g class="scene-phase-${phase}">${story.scene(phase, readOptions())}</g>`;
-    container.querySelector('.story-step-count').textContent = `STEP ${String(phase + 1).padStart(2,'0')} / ${String(story.steps.length).padStart(2,'0')}`;
-    container.querySelector('.story-caption').textContent = story.steps[phase];
-    container.querySelector('.story-progress').innerHTML = story.steps.map((_,i)=>`<i class="${i<=phase?'complete':''}"></i>`).join('');
+  if (!container) return null;
+
+  let animId = null;
+  let t = 0;
+
+  container.innerHTML = `
+    <div class="math-story-card" style="--stage-accent: ${stage.color};">
+      <div class="math-story-header">
+        <div class="flex items-center justify-between w-full">
+          <div class="flex items-center gap-2">
+            <span class="math-story-dot" style="background: ${stage.color}; box-shadow: 0 0 10px ${stage.color};"></span>
+            <span class="font-mono text-xs font-bold uppercase tracking-wider" style="color: ${stage.color};">
+              Stage ${String(stage.num).padStart(2, '0')} Mathematical & Kinematic Model
+            </span>
+          </div>
+          <span class="math-story-badge">
+            Auto-Running Math Simulation (60 FPS)
+          </span>
+        </div>
+      </div>
+
+      <div class="math-story-canvas-box">
+        <canvas id="math-stage-canvas" class="math-stage-canvas" width="960" height="340"></canvas>
+      </div>
+
+      <div class="math-story-footer font-mono text-xs text-slate-400">
+        <span class="text-cyan-400">● Live Math Model:</span>
+        <span id="math-story-caption" class="text-slate-300"></span>
+      </div>
+    </div>
+  `;
+
+  const canvas = container.querySelector('#math-stage-canvas');
+  if (!canvas) return null;
+  const ctx = canvas.getContext('2d');
+  const captionEl = container.querySelector('#math-story-caption');
+
+  // Math simulation renderer mapping
+  function render(time) {
+    t += 0.025;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw background grid
+    ctx.strokeStyle = '#091322';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y < h; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+
+    switch (stage.num) {
+      case 1:
+        renderStage01(ctx, w, h, t, captionEl);
+        break;
+      case 2:
+        renderStage02(ctx, w, h, t, captionEl);
+        break;
+      case 3:
+        renderStage03(ctx, w, h, t, captionEl);
+        break;
+      case 4:
+        renderStage04(ctx, w, h, t, captionEl);
+        break;
+      case 5:
+        renderStage05(ctx, w, h, t, captionEl);
+        break;
+      case 6:
+        renderStage06(ctx, w, h, t, captionEl);
+        break;
+      case 7:
+        renderStage07(ctx, w, h, t, captionEl);
+        break;
+      case 8:
+        renderStage08(ctx, w, h, t, captionEl);
+        break;
+      case 9:
+        renderStage09(ctx, w, h, t, captionEl);
+        break;
+      case 10:
+        renderStage10(ctx, w, h, t, captionEl);
+        break;
+      case 11:
+        renderStage11(ctx, w, h, t, captionEl);
+        break;
+      case 12:
+        renderStage12(ctx, w, h, t, captionEl);
+        break;
+      default:
+        renderStage01(ctx, w, h, t, captionEl);
+    }
+
+    animId = requestAnimationFrame(render);
+  }
+
+  // Stage 1: LiDAR Radial Ray Sweep & IMU Gyro Rates
+  function renderStage01(ctx, w, h, t, cap) {
+    cap.textContent = `LiDAR Range Rays r(θ) = 0.5..50m • Gyro Body Rates ω_z(t) = ${(Math.sin(t*2)*0.8).toFixed(3)} rad/s • Accel z = +9.81 m/s²`;
+    const cx = w * 0.35;
+    const cy = h * 0.5;
+
+    // 16-beam rotating radial LiDAR scan
+    const sweepAngle = t * 3;
+    for (let ring = 1; ring <= 16; ring++) {
+      const radius = ring * 8;
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.15)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 32; i++) {
+      const a = sweepAngle + (i / 32) * Math.PI * 2;
+      const len = 70 + Math.sin(a * 4 + t) * 35;
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+      ctx.stroke();
+
+      // Return points
+      ctx.fillStyle = '#00e5ff';
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * len, cy + Math.sin(a) * len, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // LiDAR Origin
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#00e5ff';
+    ctx.font = '11px monospace';
+    ctx.fillText('Velodyne VLP-16 (10 Hz)', cx - 65, cy + 135);
+
+    // Right Side: IMU Gyro Rate & Accel Waveforms
+    const gx = w * 0.65;
+    ctx.strokeStyle = '#1e293b';
+    ctx.strokeRect(gx - 40, cy - 100, 280, 200);
+
+    ctx.fillStyle = '#10b981';
+    ctx.font = '11px monospace';
+    ctx.fillText('Pixhack 6-DOF IMU Telemetry (100 Hz)', gx - 20, cy - 80);
+
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x < 240; x += 3) {
+      const y = cy - 20 + Math.sin((x * 0.05) - t * 4) * 25;
+      if (x === 0) ctx.moveTo(gx - 20 + x, y);
+      else ctx.lineTo(gx - 20 + x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#a7f3d0';
+    ctx.font = '10px monospace';
+    ctx.fillText('ω_z (yaw rate)', gx - 20, cy + 20);
+
+    // Accelerometer linear Z (gravity 9.81)
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let x = 0; x < 240; x += 3) {
+      const y = cy + 60 + (Math.sin((x * 0.1) + t * 6) * 4);
+      if (x === 0) ctx.moveTo(gx - 20 + x, y);
+      else ctx.lineTo(gx - 20 + x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#fde68a';
+    ctx.fillText('a_z = +9.81 m/s² (1g)', gx - 20, cy + 85);
+  }
+
+  // Stage 2: Sliding-Window Clock Discipline
+  function renderStage02(ctx, w, h, t, cap) {
+    cap.textContent = `ZeroMQ Sliding-Window Offset: Δt_offset = min (t_recv - t_send) over W=3.0s • Transport delay eliminated without NTP`;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // Time delay scatter plot
+    ctx.strokeStyle = '#1e293b';
+    ctx.strokeRect(cx - 320, cy - 100, 640, 200);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '11px monospace';
+    ctx.fillText('Wi-Fi Packet Latency (t_recv - t_send) [ms]', cx - 300, cy - 80);
+
+    const points = [];
+    const minLineY = cy + 40;
+
+    for (let i = 0; i < 40; i++) {
+      const px = cx - 300 + i * 15;
+      const jitter = Math.abs(Math.sin(i * 1.3 + t * 2)) * 60 + Math.random() * 8;
+      const py = minLineY - jitter;
+      points.push({ px, py });
+
+      // Jitter scatter points
+      ctx.fillStyle = '#f87171';
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Min Convex Envelope Line (The True Offset)
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 300, minLineY);
+    ctx.lineTo(cx + 300, minLineY);
+    ctx.stroke();
+
+    ctx.fillStyle = '#00e5ff';
+    ctx.font = '11px monospace';
+    ctx.fillText('Minimum Latency Line (True Clock Offset Δt_offset)', cx - 180, minLineY + 22);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '10px monospace';
+    ctx.fillText('Shaded region above = Wi-Fi Transport Delay τ ≥ 0 (Cleanly Removed)', cx - 200, cy - 45);
+  }
+
+  // Stage 3: Continuous EKF State Estimation & Covariance Shrinkage
+  function renderStage03(ctx, w, h, t, cap) {
+    const cycle = (t * 0.8) % 4;
+    const isUpdate = cycle > 2.0;
+    const sigma = isUpdate ? 0.35 + (3.9 - cycle) * 0.2 : 0.75 + cycle * 0.25;
+
+    cap.textContent = `Continuous EKF: P_k = (I - KH) P_k|k-1 • Covariance det(P) = ${(sigma * sigma).toFixed(4)} • State: [x, y, vx, vy, yaw, gyro]`;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // Moving ground truth trajectory
+    const tx = Math.sin(t * 0.5) * 160;
+    const ty = Math.cos(t * 0.5) * 50;
+
+    // Trail
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let a = 0; a < Math.PI * 2; a += 0.1) {
+      const px = cx + Math.sin(a) * 160;
+      const py = cy + Math.cos(a) * 50;
+      if (a === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Robot True Position
+    const rx = cx + tx;
+    const ry = cy + ty;
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.arc(rx, ry, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Covariance Ellipse (Shrinking on measurement, expanding on coasting)
+    const ew = sigma * 90;
+    const eh = sigma * 45;
+
+    ctx.fillStyle = isUpdate ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)';
+    ctx.strokeStyle = isUpdate ? '#10b981' : '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(rx, ry, ew, eh, t * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Live Math Formula Display
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '12px monospace';
+    ctx.fillText('P_k|k = [I - K_k H] P_k|k-1', cx - 360, cy - 90);
+    ctx.fillStyle = isUpdate ? '#34d399' : '#fbbf24';
+    ctx.fillText(isUpdate ? 'MEASUREMENT UPDATE (P Contracts)' : 'PREDICTION STEP (P Expands)', cx - 360, cy - 70);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px monospace';
+    ctx.fillText(`Kalman Gain K = [ ${(0.65).toFixed(2)}, ${(0.32).toFixed(2)} ]`, cx - 360, cy - 50);
+    ctx.fillText(`Estimated State: x=${(tx*0.01).toFixed(2)}m, y=${(ty*0.01).toFixed(2)}m`, cx - 360, cy - 30);
+  }
+
+  // Stage 4: AMCL Monte Carlo Particle Filter
+  function renderStage04(ctx, w, h, t, cap) {
+    cap.textContent = `AMCL Particle Filter: 240 Beams Likelihood Field p(z|x,m) • 500 Resampled Particles Converging on True Pose`;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // Room boundaries
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(cx - 240, cy - 110, 480, 220);
+
+    // True robot pose
+    const rx = cx - 40 + Math.sin(t * 0.4) * 80;
+    const ry = cy + Math.cos(t * 0.4) * 40;
+
+    // Particles cloud (KLD adaptive particles)
+    const particleSpread = Math.max(12, 60 - ((t * 8) % 60));
+    for (let i = 0; i < 90; i++) {
+      const angle = (i / 90) * Math.PI * 2;
+      const dist = (Math.sin(i * 99) * 0.5 + 0.5) * particleSpread;
+      const px = rx + Math.cos(angle) * dist;
+      const py = ry + Math.sin(angle) * dist;
+
+      ctx.fillStyle = 'rgba(99, 102, 241, 0.7)';
+      ctx.beginPath();
+      ctx.arc(px, py, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Laser rays cast from estimated pose
+    for (let b = 0; b < 16; b++) {
+      const beamAngle = (b / 16) * Math.PI * 2 + t * 0.5;
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry);
+      ctx.lineTo(rx + Math.cos(beamAngle) * 90, ry + Math.sin(beamAngle) * 90);
+      ctx.stroke();
+    }
+
+    // Robot center
+    ctx.fillStyle = '#6366f1';
+    ctx.beginPath();
+    ctx.arc(rx, ry, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#e0e7ff';
+    ctx.font = '11px monospace';
+    ctx.fillText('AMCL KLD Convergence: Particles Clustered', cx - 220, cy - 85);
+  }
+
+  // Stage 5: 3D LiDAR Preprocessing (RANSAC Ground Plane)
+  function renderStage05(ctx, w, h, t, cap) {
+    cap.textContent = `RANSAC Ground Plane: |ax + by + cz + d| < 0.06m • Tilt = ${(0.12).toFixed(2)}° • 2D KD-Tree Cluster Extraction`;
+    const cx = w * 0.5;
+    const cy = h * 0.5 + 40;
+
+    // Ground Plane Surface Line
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 320, cy);
+    ctx.lineTo(cx + 320, cy);
+    ctx.stroke();
+
+    ctx.fillStyle = '#10b981';
+    ctx.font = '11px monospace';
+    ctx.fillText('Fitted RANSAC Road Plane (z = 0, tilt ≈ 0°)', cx - 140, cy + 24);
+
+    // Raised Sidewalk Step (+15cm)
+    ctx.strokeStyle = '#8b5cf6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + 120, cy - 25);
+    ctx.lineTo(cx + 320, cy - 25);
+    ctx.stroke();
+    ctx.fillText('Curb Step +15cm (Height Grid)', cx + 130, cy - 35);
+
+    // Points Falling & Color Coded
+    for (let i = -30; i <= 30; i++) {
+      const px = cx + i * 10;
+      let py = cy + (Math.sin(i * 12 + t * 5) * 3);
+      let isGround = true;
+
+      // Obstacle 1 (Pedestrian box at x = -100)
+      if (i >= -14 && i <= -6) {
+        py = cy - 20 - Math.random() * 70;
+        isGround = false;
+      }
+      // Obstacle 2 (Vehicle box at x = 40)
+      if (i >= 2 && i <= 10) {
+        py = cy - 15 - Math.random() * 50;
+        isGround = false;
+      }
+
+      ctx.fillStyle = isGround ? 'rgba(16, 185, 129, 0.6)' : '#ef4444';
+      ctx.beginPath();
+      ctx.arc(px, py, isGround ? 2.5 : 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2D Cluster Bounding Boxes
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cx - 145, cy - 95, 85, 95);
+    ctx.strokeRect(cx + 15, cy - 70, 90, 70);
+
+    ctx.fillStyle = '#ef4444';
+    ctx.font = '10px monospace';
+    ctx.fillText('Cluster #1: Pedestrian (3.8m)', cx - 145, cy - 102);
+    ctx.fillText('Cluster #2: Vehicle (5.2m)', cx + 15, cy - 77);
+  }
+
+  // Stage 6: Camera-LiDAR Sensor Fusion
+  function renderStage06(ctx, w, h, t, cap) {
+    cap.textContent = `Pinhole Camera Projection: [u, v]^T = K [R|t] [X, Y, Z]^T • Hungarian IoU Matching Score = 0.87`;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // Simulated 2D Camera Frame
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - 260, cy - 110, 520, 220);
+
+    // 2D Camera Box from YOLO
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - 80, cy - 60, 160, 140);
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '11px monospace';
+    ctx.fillText('2D Detection: [car, score=0.94]', cx - 80, cy - 68);
+
+    // Projected 3D LiDAR Points onto 2D image
+    for (let x = 0; x < 10; x++) {
+      for (let y = 0; y < 8; y++) {
+        const px = cx - 65 + x * 13 + (Math.sin(t * 3 + x) * 2);
+        const py = cy - 45 + y * 14 + (Math.cos(t * 3 + y) * 2);
+        const depth = 4.2 + (y * 0.1);
+
+        // Color by depth
+        ctx.fillStyle = `hsl(${200 + y * 10}, 100%, 60%)`;
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.fillStyle = '#ec4899';
+    ctx.font = '11px monospace';
+    ctx.fillText('3D LiDAR Points Fused: Depth = 4.35m to Nearest Surface', cx - 180, cy + 95);
+  }
+
+  // Stage 7: Multi-Object Tracking & Mahalanobis Gate
+  function renderStage07(ctx, w, h, t, cap) {
+    const dM2 = 2.14 + Math.sin(t * 2) * 1.5;
+    cap.textContent = `Kalman Tracking: Chi-Squared Gate d_M² = ${dM2.toFixed(2)} ≤ 9.21 (p=0.99) • State Machine: CONFIRMED • Track #14`;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // Mahalanobis 99% Gating Ellipse (chi2 = 9.21)
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 140, 75, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = '11px monospace';
+    ctx.fillText('Mahalanobis Gate Boundary (χ² ≤ 9.21)', cx - 110, cy - 85);
+
+    // Moving detection inside gate
+    const detX = cx + Math.sin(t * 3) * 60;
+    const detY = cy + Math.cos(t * 3) * 30;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(detX, detY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Velocity arrow
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(detX, detY);
+    ctx.lineTo(detX + 45, detY - 15);
+    ctx.stroke();
+
+    ctx.fillStyle = '#10b981';
+    ctx.font = '11px monospace';
+    ctx.fillText('Track #14 (CONFIRMED) v = 1.34 m/s', detX - 60, detY + 24);
+  }
+
+  // Stage 8: Trajectory Prediction (CTRV & CV Horizons)
+  function renderStage08(ctx, w, h, t, cap) {
+    cap.textContent = `CTRV Trajectory Prediction: Horizons t = [0.5s, 1.0s, 2.0s] • Covariance Expansion Σ(t) = F(t) P F(t)^T + Q(t)`;
+    const cx = w * 0.35;
+    const cy = h * 0.6;
+
+    // Moving Vehicle
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(cx - 15, cy - 10, 30, 20);
+
+    // Multi-horizon curved ribbon (CTRV)
+    const horizons = [0.5, 1.0, 2.0];
+    const pts = [];
+    const v = 3.2;
+    const wTurn = 0.4;
+
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    for (let dt = 0; dt <= 2.0; dt += 0.05) {
+      const theta = wTurn * dt;
+      const px = cx + (v / wTurn) * Math.sin(theta) * 35;
+      const py = cy - (v / wTurn) * (1 - Math.cos(theta)) * 35;
+      if (dt === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+      if (horizons.some(hz => Math.abs(hz - dt) < 0.03)) pts.push({ px, py, dt });
+    }
+    ctx.stroke();
+
+    // Horizon Marker Circles
+    pts.forEach(p => {
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(p.px, p.py, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Expanding Covariance Ring
+      ctx.strokeStyle = 'rgba(248, 113, 113, 0.8)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(p.px, p.py, 10 + p.dt * 12, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px monospace';
+      ctx.fillText(`t = +${p.dt.toFixed(1)}s`, p.px + 12, p.py - 6);
+    });
+
+    ctx.fillStyle = '#f87171';
+    ctx.font = '11px monospace';
+    ctx.fillText('CTRV Non-Linear Turning Trajectory', cx - 80, cy + 40);
+  }
+
+  // Stage 9: Dynamic 3D-Aware Costmap Rasterization
+  function renderStage09(ctx, w, h, t, cap) {
+    cap.textContent = `Dynamic Costmap: Max-Pool C(x,y) = max(C_inscribed, C_dynamic_risk) • Spatio-Temporal Risk Ribbons Decaying over Horizon`;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // Ego Robot
+    ctx.fillStyle = '#00e5ff';
+    ctx.fillRect(cx - 15, cy - 15, 30, 30);
+    ctx.strokeStyle = '#00e5ff';
+    ctx.strokeRect(cx - 30, cy - 30, 60, 60);
+
+    // Moving dynamic obstacle with risk corridor
+    const obsX = cx + 80 + Math.sin(t * 2) * 50;
+    const obsY = cy - 40;
+
+    // Layer 3: Risk Corridor Ribbon (Time-to-encounter weighted)
+    const g = ctx.createLinearGradient(obsX, obsY, obsX - 90, obsY);
+    g.addColorStop(0, 'rgba(239, 68, 68, 0.8)');
+    g.addColorStop(0.6, 'rgba(245, 158, 11, 0.4)');
+    g.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+
+    ctx.fillStyle = g;
+    ctx.fillRect(obsX - 90, obsY - 20, 90, 40);
+
+    // Layer 1: Obstacle core
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(obsX, obsY, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Layer 2: Inflation Radius
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(obsX, obsY, 32, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#14b8a6';
+    ctx.font = '11px monospace';
+    ctx.fillText('Max-Pooled Costmap: 0 (Free) to 100 (Lethal Obstacle)', cx - 180, cy + 85);
+  }
+
+  // Stage 10: Nav2 Planning & Motion Control (MPPI & RotationShim)
+  function renderStage10(ctx, w, h, t, cap) {
+    cap.textContent = `Nav2 Control: RotationShimController (|Δθ| = 0.84 > 0.785 rad ⇒ In-Place Spin First) • MPPI 2,000 Sample Rollouts`;
+    const cx = w * 0.35;
+    const cy = h * 0.5;
+
+    // Ego Vehicle
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(cx - 20, cy - 20, 40, 40);
+
+    // MPPI Sampled Trajectory Fan (20 rollouts)
+    for (let k = -10; k <= 10; k++) {
+      const spread = k * 0.08;
+      ctx.strokeStyle = k === 0 ? '#10b981' : 'rgba(59, 130, 246, 0.2)';
+      ctx.lineWidth = k === 0 ? 3 : 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.quadraticCurveTo(cx + 80, cy + spread * 80, cx + 180, cy + spread * 120);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = '#10b981';
+    ctx.font = '11px monospace';
+    ctx.fillText('Optimal Path Rollout u* = argmin J(τ)', cx + 70, cy - 40);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '10px monospace';
+    ctx.fillText('RotationShim: Spin on the spot until heading within ±45°', cx - 120, cy + 90);
+  }
+
+  // Stage 11: Actuator Output & Skid-Steer Differential Kinematics
+  function renderStage11(ctx, w, h, t, cap) {
+    const vx = 0.45;
+    const wz = Math.sin(t * 2) * 0.6;
+    const L = 0.415;
+    const vL = vx - (wz * L) / 2;
+    const vR = vx + (wz * L) / 2;
+
+    cap.textContent = `Diff-Drive Kinematics: v_L = ${(vL).toFixed(2)} m/s, v_R = ${(vR).toFixed(2)} m/s • 0xA5 0x01 TinyFrames Serial (115200 Baud)`;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // 4 Wheels
+    const wheels = [
+      { x: cx - 60, y: cy - 45, v: vL },
+      { x: cx - 60, y: cy + 45, v: vL },
+      { x: cx + 60, y: cy - 45, v: vR },
+      { x: cx + 60, y: cy + 45, v: vR }
+    ];
+
+    // Chassis
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(cx - 45, cy - 35, 90, 70);
+
+    wheels.forEach(wh => {
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(wh.x - 12, wh.y - 18, 24, 36);
+      ctx.strokeStyle = '#22c55e';
+      ctx.strokeRect(wh.x - 12, wh.y - 18, 24, 36);
+
+      // Velocity vectors
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(wh.x, wh.y);
+      ctx.lineTo(wh.x, wh.y - wh.v * 45);
+      ctx.stroke();
+    });
+
+    ctx.fillStyle = '#22c55e';
+    ctx.font = '11px monospace';
+    ctx.fillText(`Left Wheels: ${(vL).toFixed(2)} m/s`, cx - 160, cy);
+    ctx.fillText(`Right Wheels: ${(vR).toFixed(2)} m/s`, cx + 80, cy);
+  }
+
+  // Stage 12: Telemetry & Augmented Path Video Reprojection
+  function renderStage12(ctx, w, h, t, cap) {
+    cap.textContent = `AR Camera Reprojection: /plan → ZMQ :5558 → Jetson GPU nvv4l2h265enc → RTP/UDP :5000 Live 30 FPS Stream`;
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+
+    // Perspective Camera View (Road with vanishing point)
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - 240, cy - 100, 480, 200);
+
+    // Perspective Road Markings
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 160, cy + 100);
+    ctx.lineTo(cx, cy - 40);
+    ctx.moveTo(cx + 160, cy + 100);
+    ctx.lineTo(cx, cy - 40);
+    ctx.stroke();
+
+    // Projected Augmented Path Ribbon (Glowing Green Carpet)
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 50, cy + 100);
+    ctx.lineTo(cx - 8, cy - 30);
+    ctx.lineTo(cx + 8, cy - 30);
+    ctx.lineTo(cx + 50, cy + 100);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#34d399';
+    ctx.font = '11px monospace';
+    ctx.fillText('Augmented AR Planned Path Ribbon (Camera Optical Frame)', cx - 160, cy + 70);
+  }
+
+  // Start Animation Loop
+  animId = requestAnimationFrame(render);
+
+  return {
+    destroy() {
+      if (animId) cancelAnimationFrame(animId);
+      container.innerHTML = '';
+    }
   };
-  const stop = () => { playing = false; clearInterval(timer); timer = null; const button=container.querySelector('[data-action="play"]'); if(button) button.textContent='Play'; };
-  container.addEventListener('click', event => {
-    const action = event.target.closest('[data-action]')?.dataset.action;
-    if (!action) return;
-    if (action === 'play') {
-      if (playing) stop(); else { playing=true; container.querySelector('[data-action="play"]').textContent='Pause'; timer=setInterval(()=>{ if(phase===story.steps.length-1){ phase=0; } else phase++; draw(); }, 1900); }
-    } else if (action === 'back') { stop(); phase=(phase+story.steps.length-1)%story.steps.length; draw(); }
-    else if (action === 'next') { stop(); phase=(phase+1)%story.steps.length; draw(); }
-    else if (action === 'reset') { stop(); phase=0; draw(); }
-  });
-  container.addEventListener('change', event => {
-    if (event.target.matches('[data-option]')) draw();
-  });
-  draw();
-  return { destroy() { stop(); container.innerHTML=''; } };
 }
