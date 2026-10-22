@@ -40,13 +40,13 @@
     <div class="mb-6">
       <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
             style="background: #3b82f620; color: #3b82f6; border: 1px solid #3b82f660">
-        Stage 10 • Autonomous Navigation
+        Stage 10 • Autonomous Navigation & GPS Routing
       </span>
       <h1 class="text-3xl md:text-5xl font-black text-white mt-3 mb-4">
         Nav2 Planning & Motion Control
       </h1>
       <p class="text-base text-slate-300 leading-relaxed">
-        High-level path planning and trajectory execution. Nav2 Server manages global path generation (Theta*, Smac) and local control (RotationShim + DWB or MPPI) with traversability awareness.
+        Full autonomous navigation pipeline to GPS goals. Features gps_goal_node for datum conversion and lane graph routing, Nav2 Smac Hybrid-A* (Dubins car model with 3m turning radius), Regulated Pure Pursuit, nav2_collision_monitor safety zones, and predictive_speed_limit_node for corridor-crossing yielding.
       </p>
     </div>
 
@@ -62,36 +62,36 @@
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
               <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 10.1</span>
               <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
-                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
-                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+                <span>Rate: <strong class="text-emerald-400">On Goal / 30m Sub-goals</strong></span>
+                <span>Frame: <strong class="text-cyan-400">map</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">2.5D Elevation Traversability Classification</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">traversability_node analyzes terrain step heights, slopes, and negative obstacles (craters) to emit lethal point clouds for costmap ingestion.</p>
+            <h3 class="text-base font-bold text-white mb-1">GPS-to-Map Datum & Lane-Graph Route Routing</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">gps_goal_node projects GPS lat/lon to map via origin datum (19.1334° N, 72.9133° E). Finds shortest route across /carla/map/road_graph lane polylines (with lane change edges, +5m cost) and emits 30m sub-goals to NavigateToPose.</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
               <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 10.2</span>
               <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
-                <span>Rate: <strong class="text-emerald-400">1 Hz / Goal Trigger</strong></span>
+                <span>Rate: <strong class="text-emerald-400">2 Hz Replanning</strong></span>
                 <span>Frame: <strong class="text-cyan-400">map</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Global Collision-Free Path Planning</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">planner_server calculates optimal geometric path across global costmap using Theta* or SmacPlanner2D with Euclidean heuristic.</p>
+            <h3 class="text-base font-bold text-white mb-1">Nav2 SmacPlannerHybrid (Dubins Car Kinematics)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Computes kinematically feasible car trajectories with minimum turning radius r = 3.0m on rolling 120m global costmap fed by /costmap/nav. Treats unknown cells as free (0 cost) to eliminate plan timeouts (0.01s vs 0.94s).</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
               <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 10.3</span>
               <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
-                <span>Rate: <strong class="text-emerald-400">20 Hz</strong></span>
-                <span>Frame: <strong class="text-cyan-400">base_link</strong></span>
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Rotation Shim Angular Alignment</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">When path deviation angle > 45° (0.785 rad), RotationShimController forces zero linear speed and commands in-place skid rotation first.</p>
+            <h3 class="text-base font-bold text-white mb-1">Predictive Corridor Yielding (predictive_speed_limit_node)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Checks Stage 7/8 predicted trajectories against the ego corridor. If an object crosses ahead, publishes dynamic speed caps on /speed_limit ensuring the car stops 1.5m short; extends paths until objects clear corridor.</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
@@ -99,11 +99,11 @@
               <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 10.4</span>
               <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
                 <span>Rate: <strong class="text-emerald-400">20 Hz</strong></span>
-                <span>Frame: <strong class="text-cyan-400">base_link</strong></span>
+                <span>Frame: <strong class="text-cyan-400">base_footprint</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Model Predictive Path Following (MPPI / DWB)</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">Evaluates thousands of sampled trajectories over 32 time steps (dt=0.05s) minimizing cost penalties for obstacle proximity, goal distance, and smooth speed.</p>
+            <h3 class="text-base font-bold text-white mb-1">Regulated Pure Pursuit & Nav2 Collision Monitor</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Tracks path carrot (1.5-6.0m horizon, 1.2s lookahead) at 2.5 m/s cruise. collision_monitor filters /cmd_vel_nav: halts car on LiDAR points within 1.3m stop polygon, and slows to 40% in 5.0m slow polygon.</p>
           </div>
         
       </div>
@@ -121,45 +121,75 @@
           
             <div class="border-b border-slate-800/80 pb-3">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold text-white font-mono">planner_server</span>
-                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Nav2 Action Server</span>
+                <span class="text-sm font-bold text-white font-mono">gps_goal_node</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">GPS & Road Graph Router</span>
               </div>
-              <p class="text-xs text-slate-400 mt-1 mb-2">Computes global /plan from ego pose to goal waypoint.</p>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Converts GPS coordinates via datum, routes along /carla/map/road_graph, and feeds 30m NavigateToPose sub-goals.</p>
               
-                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_navigation/config/nav2_params.yaml" 
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_navigation/perceptron_navigation/gps_goal_node.py" 
                    target="_blank" 
                    class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
-                  <span>src/perceptron_navigation/config/nav2_params.yaml</span> ↗
+                  <span>src/perceptron_navigation/perceptron_navigation/gps_goal_node.py</span> ↗
+                </a>
+              
+            </div>
+
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">predictive_speed_limit_node</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Corridor Yielding Node</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Monitors predicted object paths against Nav2 plan corridor and publishes /speed_limit to prevent collisions.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_navigation/perceptron_navigation/predictive_speed_limit_node.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_navigation/perceptron_navigation/predictive_speed_limit_node.py</span> ↗
                 </a>
               
             </div>
           
             <div class="border-b border-slate-800/80 pb-3">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold text-white font-mono">controller_server</span>
+                <span class="text-sm font-bold text-white font-mono">planner_server (Smac Hybrid-A*)</span>
                 <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Nav2 Action Server</span>
               </div>
-              <p class="text-xs text-slate-400 mt-1 mb-2">Generates real-time velocity commands /cmd_vel using RotationShimController wrapping DWB or MPPI.</p>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Plans Dubins paths with 3m turning radius on 120m rolling costmap fed by /costmap/nav.</p>
               
-                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_navigation/config/nav2_params.yaml" 
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_carla/config/nav2_carla.yaml" 
                    target="_blank" 
                    class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
-                  <span>src/perceptron_navigation/config/nav2_params.yaml</span> ↗
+                  <span>src/perceptron_carla/config/nav2_carla.yaml</span> ↗
                 </a>
               
             </div>
           
             <div class="border-b border-slate-800/80 pb-3">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold text-white font-mono">traversability_node</span>
-                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Terrain Analysis Node</span>
+                <span class="text-sm font-bold text-white font-mono">controller_server (Pure Pursuit)</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Nav2 Action Server</span>
               </div>
-              <p class="text-xs text-slate-400 mt-1 mb-2">Identifies craters (negative obstacles) and rocks (positive obstacles) in lunar/outdoor terrain.</p>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Regulated Pure Pursuit controller tracking carrot at 2.5 m/s, yielding via /speed_limit; outputs to /cmd_vel_nav.</p>
               
-                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_navigation/perceptron_navigation/traversability_node.py" 
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_carla/config/nav2_carla.yaml" 
                    target="_blank" 
                    class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
-                  <span>src/perceptron_navigation/perceptron_navigation/traversability_node.py</span> ↗
+                  <span>src/perceptron_carla/config/nav2_carla.yaml</span> ↗
+                </a>
+              
+            </div>
+
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">collision_monitor</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Safety Watchdog Node</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Direct LiDAR safety checks in front of the vehicle nose (1.3m stop, 5.0m slow polygon) gating /cmd_vel.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_carla/config/nav2_carla.yaml" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_carla/config/nav2_carla.yaml</span> ↗
                 </a>
               
             </div>
@@ -177,20 +207,38 @@
           
             <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
               <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
-                <span>/plan</span>
-                <span class="text-[10px] text-slate-400">1 Hz</span>
-              </div>
-              <div class="text-[11px] text-slate-400">nav_msgs/msg/Path (global coordinates)</div>
-              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Controller & Camera Overlay</div>
-            </div>
-          
-            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
-              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
                 <span>/cmd_vel</span>
                 <span class="text-[10px] text-slate-400">20 Hz</span>
               </div>
               <div class="text-[11px] text-slate-400">geometry_msgs/msg/Twist (vx, wz)</div>
-              <div class="text-[10px] text-emerald-400 mt-1">Consumer: STM32 Motor Bridge</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: carla_bridge --control ros / stm32_bridge_node</div>
+            </div>
+
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/plan</span>
+                <span class="text-[10px] text-slate-400">2 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">nav_msgs/msg/Path (Dubins planned arc)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Controller & Camera Overlay</div>
+            </div>
+
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/speed_limit</span>
+                <span class="text-[10px] text-slate-400">10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">nav2_msgs/msg/SpeedLimit</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: controller_server (Predictive Yielding)</div>
+            </div>
+
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/gps_goal/route</span>
+                <span class="text-[10px] text-slate-400">On Goal</span>
+              </div>
+              <div class="text-[11px] text-slate-400">nav_msgs/msg/Path (Road Lane Graph)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: RViz road route visualization</div>
             </div>
           
         </div>
@@ -203,16 +251,14 @@
         <span class="w-2 h-2 rounded-full bg-purple-400"></span>
         Core Algorithmic Implementation
       </h3>
-      <pre class="code-container p-5"><code># nav2_params.yaml: Controller RotationShim setup for 4-wheel skid-steer
-controller_server:
-  ros__parameters:
-    controller_plugins: ["FollowPath"]
-    FollowPath:
-      plugin: "nav2_rotation_shim_controller::RotationShimController"
-      primary_controller: "dwb_core::DWBLocalPlanner"
-      angular_dist_threshold: 0.785   # 45 deg: beyond this, spin on the spot first
-      forward_sampling_distance: 0.5
-      rotate_to_heading_angular_vel: 0.6</code></pre>
+      <pre class="code-container p-5"><code># predictive_speed_limit_node.py: Corridor yielding calculation
+# Never reach a spot before a crossing person has cleared it, stop 1.5m short
+def limit_for_crossing(path_ego, obj_predicted_path, gap=1.5, decel=2.0):
+    t_obj_clear, s_corridor = compute_intersection(path_ego, obj_predicted_path)
+    if t_obj_clear is not None:
+        v_max = (s_corridor - gap) / t_obj_clear
+        return min(v_max, math.sqrt(2 * decel * max(0.0, s_corridor - gap)))
+    return 4.0 # unconstrained cruise</code></pre>
     </section>
 
     <!-- Bottom Navigation -->

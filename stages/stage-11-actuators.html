@@ -40,13 +40,13 @@
     <div class="mb-6">
       <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
             style="background: #22c55e20; color: #22c55e; border: 1px solid #22c55e60">
-        Stage 11 • Physical Execution
+        Stage 11 • Vehicle Kinematics & Execution
       </span>
       <h1 class="text-3xl md:text-5xl font-black text-white mt-3 mb-4">
-        Actuator Output & Hardware
+        Actuator Output & Vehicle Control
       </h1>
       <p class="text-base text-slate-300 leading-relaxed">
-        Translates high-level Twist commands into physical motor torques. stm32_bridge_node packs serial TinyFrames; onboard STM32 executes closed-loop PID velocity control across 4 skid-steer wheels.
+        Translates velocity commands (/cmd_vel) into physical vehicle execution across dual backends: CARLA autonomous vehicle control (carla_bridge --control ros with vehicle_control.py: curvature-to-Ackermann steering, speed PI loop, safety watchdog, and collision referee) and physical rover hardware (stm32_bridge_node: TinyFrames serial, 100 Hz PID).
       </p>
     </div>
 
@@ -62,48 +62,48 @@
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
               <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 11.1</span>
               <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
-                <span>Rate: <strong class="text-emerald-400">20 Hz</strong></span>
-                <span>Frame: <strong class="text-cyan-400">base_link</strong></span>
+                <span>Rate: <strong class="text-emerald-400">20 Hz (sim tick)</strong></span>
+                <span>Frame: <strong class="text-cyan-400">base_footprint</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Command Velocity Framing</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">stm32_bridge_node converts vx (m/s) and wz (rad/s) into 0xA5 0x01 TinyFrames payload with XOR checksum.</p>
+            <h3 class="text-base font-bold text-white mb-1">Ackermann Curvature Steering (vehicle_control.py)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Converts Twist (vx, wz) into Ackermann front-wheel angle: curvature kappa = wz / vx, steering delta = atan(L * kappa) with wheelbase L=1.525m. Maps to CARLA steer [-1, 1] clamped to max 35° (2.18m min turning radius).</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
               <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 11.2</span>
               <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
-                <span>Rate: <strong class="text-emerald-400">Hardware Loop</strong></span>
-                <span>Frame: <strong class="text-cyan-400">STM32 Firmware</strong></span>
+                <span>Rate: <strong class="text-emerald-400">20 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">Vehicle Chassis</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Communication Watchdog Timer</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">ECU hardware watchdog shuts off H-bridge PWM drives if no valid /cmd_vel frame is received within 300 ms.</p>
+            <h3 class="text-base font-bold text-white mb-1">Speed PI Regulation & Standstill Gear Interlock</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">A PI controller (Kp=0.35, Ki=0.25) regulates throttle/brake against measured forward speed. Gear transitions (forward/reverse) enforce a complete vehicle standstill before switching to protect powertrain.</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
               <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 11.3</span>
               <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
-                <span>Rate: <strong class="text-emerald-400">100 Hz</strong></span>
-                <span>Frame: <strong class="text-cyan-400">Chassis</strong></span>
+                <span>Rate: <strong class="text-emerald-400">Continuous (20 Hz)</strong></span>
+                <span>Frame: <strong class="text-cyan-400">Watchdog Loop</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Differential Kinematics & Skid Scrubbing</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">Calculates individual left and right track speeds: v_left = vx - (wz * track_width / 2); v_right = vx + (wz * track_width / 2).</p>
+            <h3 class="text-base font-bold text-white mb-1">Safety Watchdog & E-Stop Interlock</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Commands full braking if /cmd_vel is older than 0.5s (watchdog timeout) or if /carla/estop is received. Slew limiter caps steering rate to 1.5 units/s and enforces max speed <= 4.0 m/s.</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
               <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 11.4</span>
               <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
-                <span>Rate: <strong class="text-emerald-400">100 Hz</strong></span>
-                <span>Frame: <strong class="text-cyan-400">Motor Driver</strong></span>
+                <span>Rate: <strong class="text-emerald-400">Event / 100 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">carla_world / Hardware ECU</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Closed-Loop Motor PID Current Regulation</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">STM32 microcontroller executes 100 Hz PID loop against encoder feedback, driving high-current MOSFET H-bridges.</p>
+            <h3 class="text-base font-bold text-white mb-1">Collision Sensor Telemetry & Hardware STM32 Mode</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">In CARLA, /carla/ego/collision records any physical actor contact impulses as a referee for benchmark scenarios. On physical rover hardware, stm32_bridge_node sends 0xA5 0x01 TinyFrames to 4-wheel skid-steer H-bridges.</p>
           </div>
         
       </div>
@@ -121,30 +121,45 @@
           
             <div class="border-b border-slate-800/80 pb-3">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold text-white font-mono">stm32_bridge_node</span>
-                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Hardware Actuator Bridge</span>
+                <span class="text-sm font-bold text-white font-mono">carla_bridge (--control ros)</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Simulation Control Bridge</span>
               </div>
-              <p class="text-xs text-slate-400 mt-1 mb-2">Transmits serial motion commands and enforces safety speed limits.</p>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Subscribes to /cmd_vel and /carla/estop; drives CARLA vehicle using vehicle_control.py and publishes collision telemetry.</p>
               
-                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_hardware/perceptron_hardware/stm32_bridge_node.py" 
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_carla/perceptron_carla/carla_bridge.py" 
                    target="_blank" 
                    class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
-                  <span>src/perceptron_hardware/perceptron_hardware/stm32_bridge_node.py</span> ↗
+                  <span>src/perceptron_carla/perceptron_carla/carla_bridge.py</span> ↗
+                </a>
+              
+            </div>
+
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">vehicle_control.py (TwistController)</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Vehicle Controller Module</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Calculates Ackermann steering angle from curvature, regulates speed PI loop, and enforces watchdog timeouts.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_carla/perceptron_carla/vehicle_control.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_carla/perceptron_carla/vehicle_control.py</span> ↗
                 </a>
               
             </div>
           
             <div class="border-b border-slate-800/80 pb-3">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold text-white font-mono">STM32F405 Motor Driver Firmware</span>
-                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Embedded C Firmware</span>
+                <span class="text-sm font-bold text-white font-mono">stm32_bridge_node</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Hardware Actuator Bridge</span>
               </div>
-              <p class="text-xs text-slate-400 mt-1 mb-2">Runs closed-loop current/velocity PID regulation and ADC battery monitoring.</p>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Transmits serial TinyFrames to physical rover STM32 microcontroller for 4-wheel differential skid-steer driving.</p>
               
-                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/STM32_Serial_motorDriver/Core/Src/main.c" 
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_hardware/perceptron_hardware/stm32_bridge_node.py" 
                    target="_blank" 
                    class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
-                  <span>STM32_Serial_motorDriver/Core/Src/main.c</span> ↗
+                  <span>src/perceptron_hardware/perceptron_hardware/stm32_bridge_node.py</span> ↗
                 </a>
               
             </div>
@@ -162,29 +177,29 @@
           
             <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
               <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>carla.VehicleControl</span>
+                <span class="text-[10px] text-slate-400">20 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">CARLA RPC (throttle, steer, brake, reverse)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: CARLA Ego Vehicle Actor</div>
+            </div>
+
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/carla/ego/collision</span>
+                <span class="text-[10px] text-slate-400">Event</span>
+              </div>
+              <div class="text-[11px] text-slate-400">std_msgs/msg/String (JSON actor impulse)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: scenario_suite referee & benchmark</div>
+            </div>
+
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
                 <span>UART TX 0xA5 0x01</span>
                 <span class="text-[10px] text-slate-400">20 Hz</span>
               </div>
-              <div class="text-[11px] text-slate-400">Serial Bytes</div>
-              <div class="text-[10px] text-emerald-400 mt-1">Consumer: STM32 ECU</div>
-            </div>
-          
-            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
-              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
-                <span>Motor PWM & Direction</span>
-                <span class="text-[10px] text-slate-400">20 kHz PWM</span>
-              </div>
-              <div class="text-[11px] text-slate-400">MOSFET Drive</div>
-              <div class="text-[10px] text-emerald-400 mt-1">Consumer: 4x High Torque DC Motors</div>
-            </div>
-          
-            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
-              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
-                <span>/battery/state</span>
-                <span class="text-[10px] text-slate-400">1 Hz</span>
-              </div>
-              <div class="text-[11px] text-slate-400">sensor_msgs/msg/BatteryState</div>
-              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Diagnostics</div>
+              <div class="text-[11px] text-slate-400">Serial TinyFrames Binary</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Physical STM32 ECU</div>
             </div>
           
         </div>
@@ -197,13 +212,16 @@
         <span class="w-2 h-2 rounded-full bg-purple-400"></span>
         Core Algorithmic Implementation
       </h3>
-      <pre class="code-container p-5"><code># stm32_bridge_node.py: Serial Command Framing
-def send_cmd_vel(self, vx: float, wz: float):
-    # Pack linear and angular speed into binary payload
-    payload = struct.pack('<ff', float(vx), float(wz))
-    checksum = calc_xor_checksum(payload)
-    frame = bytes([PROTO_SOF_NEW, FRAME_CMD_VEL, len(payload)]) + payload + bytes([checksum, PROTO_EOF_NEW])
-    self.serial_port.write(frame)</code></pre>
+      <pre class="code-container p-5"><code># vehicle_control.py: Curvature to Ackermann steering & Speed PI
+# Curvature k = w / v floored at v_min_steer
+d = math.atan(self.L * w_cmd / v_ref) if w_cmd else 0.0
+d = max(-self.max_steer, min(self.max_steer, d))
+target_steer = -d / self.max_wheel_steer
+
+# PI Speed control loop
+err = target_speed - speed
+self.integral = max(-1.0, min(1.0, self.integral + err * dt))
+throttle = self.ff0 + self.ff1 * target_speed + self.kp * err + self.ki * self.integral</code></pre>
     </section>
 
     <!-- Bottom Navigation -->

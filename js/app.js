@@ -11,18 +11,9 @@ class PipelineDocsApp {
   constructor() {
     this.activeStage = PIPELINE_STAGES[0];
     this.activeStory = null;
-    this.currentViewMode = 'algomaster'; // 'algomaster' or 'horizontal'
+    this.currentViewMode = 'horizontal'; // 'horizontal' (default) or 'algomaster'
 
-    // Mount Top-to-Bottom AlgoMaster Graph
-    this.algoGraph = mountAlgoMasterGraph(
-      document.getElementById('algomaster-pipeline-graph'),
-      PIPELINE_STAGES,
-      PIPELINE_TOPIC_CONNECTIONS,
-      stage => this.selectStageById(stage.id, true)
-    );
-    this.algoGraph?.setActiveStage(this.activeStage.id);
-
-    // Mount Horizontal Whole Graph
+    // Mount Horizontal Whole Graph (Default View)
     this.wholeGraph = mountWholeGraph(
       document.getElementById('whole-pipeline-graph'),
       PIPELINE_STAGES,
@@ -30,6 +21,15 @@ class PipelineDocsApp {
       stage => this.selectStageById(stage.id, false)
     );
     this.wholeGraph?.setActiveStage(this.activeStage.id);
+
+    // Mount Top-to-Bottom AlgoMaster Graph (Secondary View)
+    this.algoGraph = mountAlgoMasterGraph(
+      document.getElementById('algomaster-pipeline-graph'),
+      PIPELINE_STAGES,
+      PIPELINE_TOPIC_CONNECTIONS,
+      stage => this.selectStageById(stage.id, true)
+    );
+    this.algoGraph?.setActiveStage(this.activeStage.id);
 
     this.renderPipelineTrack();
     this.setupScrollControls();
@@ -42,6 +42,7 @@ class PipelineDocsApp {
     const btnHori = document.getElementById('view-mode-horizontal');
     const containerAlgo = document.getElementById('algomaster-view-container');
     const containerHori = document.getElementById('horizontal-view-container');
+    const modeNote = document.querySelector('.pipeline-mode-note');
 
     const setMode = (mode) => {
       this.currentViewMode = mode;
@@ -53,6 +54,7 @@ class PipelineDocsApp {
 
         if (containerAlgo) containerAlgo.style.display = 'block';
         if (containerHori) containerHori.style.display = 'none';
+        if (modeNote) modeNote.innerHTML = '<span class="pulse-indicator"></span> AlgoMaster Graph <span>Top-to-Bottom Flow • Continuous Topics</span>';
 
         // Trigger redraw so wires calculate exact positions
         window.dispatchEvent(new Event('resize'));
@@ -64,6 +66,7 @@ class PipelineDocsApp {
 
         if (containerAlgo) containerAlgo.style.display = 'none';
         if (containerHori) containerHori.style.display = 'block';
+        if (modeNote) modeNote.innerHTML = '<span class="pulse-indicator"></span> Horizontal Track <span>Interactive Data Flow • Click Stages to Inspect</span>';
 
         // Trigger resize for horizontal graph
         window.dispatchEvent(new Event('resize'));

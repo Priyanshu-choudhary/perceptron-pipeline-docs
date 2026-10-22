@@ -545,121 +545,177 @@ export function mountStageStory(container, stage) {
 
   // Stage 9: Dynamic 3D-Aware Costmap Rasterization
   function renderStage09(ctx, w, h, t, cap) {
-    cap.textContent = `Dynamic Costmap: Max-Pool C(x,y) = max(C_inscribed, C_dynamic_risk) • Spatio-Temporal Risk Ribbons Decaying over Horizon`;
+    cap.textContent = `Dynamic Costmap: /costmap/nav (Lethal Obstacles + Spatio-Temporal Risk Ribbons for Nav2 Footprint Inflation)`;
     const cx = w * 0.5;
     const cy = h * 0.5;
 
-    // Ego Robot
+    // Ego Robot Footprint
     ctx.fillStyle = '#00e5ff';
     ctx.fillRect(cx - 15, cy - 15, 30, 30);
     ctx.strokeStyle = '#00e5ff';
     ctx.strokeRect(cx - 30, cy - 30, 60, 60);
 
-    // Moving dynamic obstacle with risk corridor
+    // Dynamic obstacle moving with risk corridor
     const obsX = cx + 80 + Math.sin(t * 2) * 50;
     const obsY = cy - 40;
 
     // Layer 3: Risk Corridor Ribbon (Time-to-encounter weighted)
     const g = ctx.createLinearGradient(obsX, obsY, obsX - 90, obsY);
-    g.addColorStop(0, 'rgba(239, 68, 68, 0.8)');
-    g.addColorStop(0.6, 'rgba(245, 158, 11, 0.4)');
+    g.addColorStop(0, 'rgba(239, 68, 68, 0.85)');
+    g.addColorStop(0.6, 'rgba(245, 158, 11, 0.45)');
     g.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
 
     ctx.fillStyle = g;
     ctx.fillRect(obsX - 90, obsY - 20, 90, 40);
 
-    // Layer 1: Obstacle core
+    // Layer 1: Raw Lethal Obstacle (Published directly on /costmap/nav)
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(obsX, obsY, 12, 0, Math.PI * 2);
     ctx.fill();
 
-    // Layer 2: Inflation Radius
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
-    ctx.lineWidth = 2;
+    // Layer 2: Nav2 Footprint Inflation Boundary
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
     ctx.beginPath();
     ctx.arc(obsX, obsY, 32, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.setLineDash([]);
 
     ctx.fillStyle = '#14b8a6';
     ctx.font = '11px monospace';
-    ctx.fillText('Max-Pooled Costmap: 0 (Free) to 100 (Lethal Obstacle)', cx - 180, cy + 85);
+    ctx.fillText('/costmap/nav: Lethal + Dynamic Risk (Nav2 inflates true footprint)', cx - 210, cy + 85);
   }
 
-  // Stage 10: Nav2 Planning & Motion Control (MPPI & RotationShim)
+  // Stage 10: Nav2 Planning, Pure Pursuit & Predictive Yielding
   function renderStage10(ctx, w, h, t, cap) {
-    cap.textContent = `Nav2 Control: RotationShimController (|Δθ| = 0.84 > 0.785 rad ⇒ In-Place Spin First) • MPPI 2,000 Sample Rollouts`;
-    const cx = w * 0.35;
-    const cy = h * 0.5;
+    const isYielding = Math.sin(t * 1.5) > 0.1;
+    const speed = isYielding ? 0.0 : 2.5;
+    cap.textContent = `Nav2 Smac Hybrid-A* (Dubins r=3.0m) • Pure Pursuit (v=${speed.toFixed(1)} m/s) • Collision Monitor (1.3m / 5.0m) • Predictive Yield: ${isYielding ? 'YIELDING (/speed_limit = 0)' : 'CLEAR'}`;
+    const cx = w * 0.32;
+    const cy = h * 0.52;
 
-    // Ego Vehicle
-    ctx.fillStyle = '#3b82f6';
-    ctx.fillRect(cx - 20, cy - 20, 40, 40);
+    // Dubins Path Spline (Green)
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx - 60, cy + 40);
+    ctx.bezierCurveTo(cx + 40, cy + 40, cx + 80, cy - 30, cx + 220, cy - 30);
+    ctx.stroke();
 
-    // MPPI Sampled Trajectory Fan (20 rollouts)
-    for (let k = -10; k <= 10; k++) {
-      const spread = k * 0.08;
-      ctx.strokeStyle = k === 0 ? '#10b981' : 'rgba(59, 130, 246, 0.2)';
-      ctx.lineWidth = k === 0 ? 3 : 1;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.quadraticCurveTo(cx + 80, cy + spread * 80, cx + 180, cy + spread * 120);
-      ctx.stroke();
-    }
+    // Road Route Guide (White dashed)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(cx - 70, cy + 40);
+    ctx.bezierCurveTo(cx + 40, cy + 40, cx + 80, cy - 30, cx + 230, cy - 30);
+    ctx.stroke();
+    ctx.setLineDash([]);
 
-    ctx.fillStyle = '#10b981';
-    ctx.font = '11px monospace';
-    ctx.fillText('Optimal Path Rollout u* = argmin J(τ)', cx + 70, cy - 40);
-
-    ctx.fillStyle = '#94a3b8';
+    // Pure Pursuit Lookahead Carrot (Yellow)
+    const carrotX = cx + 90;
+    const carrotY = cy - 25;
+    ctx.fillStyle = '#eab308';
+    ctx.beginPath();
+    ctx.arc(carrotX, carrotY, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#eab308';
     ctx.font = '10px monospace';
-    ctx.fillText('RotationShim: Spin on the spot until heading within ±45°', cx - 120, cy + 90);
+    ctx.fillText('Carrot (1.2s lookahead)', carrotX - 10, carrotY - 10);
+
+    // Ego Vehicle (Microlino / Rover)
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(cx - 24, cy + 26, 48, 28);
+
+    // Collision Monitor Stop Polygon (1.3m ahead - Red)
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cx + 24, cy + 28, 26, 24);
+
+    // Collision Monitor Slow Polygon (5.0m ahead - Orange)
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.strokeRect(cx + 24, cy + 22, 65, 36);
+    ctx.setLineDash([]);
+
+    // Crossing Pedestrian with Predictive Yield Corridor
+    const pedX = cx + 80;
+    const pedY = isYielding ? cy - 10 : cy - 80;
+    ctx.fillStyle = '#f43f5e';
+    ctx.beginPath();
+    ctx.arc(pedX, pedY, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = '10px monospace';
+    ctx.fillText('Walker Crossing', pedX - 15, pedY - 12);
+
+    if (isYielding) {
+      // Yield barrier marker
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + 50, cy + 15);
+      ctx.lineTo(cx + 50, cy + 55);
+      ctx.stroke();
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('STOP (1.5m Gap)', cx + 40, cy + 70);
+    }
   }
 
-  // Stage 11: Actuator Output & Skid-Steer Differential Kinematics
+  // Stage 11: Actuator Output & Vehicle Control (Ackermann & Speed PI)
   function renderStage11(ctx, w, h, t, cap) {
-    const vx = 0.45;
-    const wz = Math.sin(t * 2) * 0.6;
-    const L = 0.415;
-    const vL = vx - (wz * L) / 2;
-    const vR = vx + (wz * L) / 2;
+    const vx = 2.4;
+    const kappa = Math.sin(t * 1.8) * 0.28; // curvature w / v
+    const L = 1.525; // Microlino wheelbase
+    const deltaRad = Math.atan(L * kappa);
+    const deltaDeg = deltaRad * (180 / Math.PI);
+    const throttle = 0.38 + Math.max(0, Math.sin(t * 2)) * 0.15;
 
-    cap.textContent = `Diff-Drive Kinematics: v_L = ${(vL).toFixed(2)} m/s, v_R = ${(vR).toFixed(2)} m/s • 0xA5 0x01 TinyFrames Serial (115200 Baud)`;
+    cap.textContent = `Ackermann Steering: δ = atan(L·κ) = ${deltaDeg.toFixed(1)}° • Speed PI: Throttle ${(throttle * 100).toFixed(0)}% • Watchdog: 0.12s < 0.5s • Collision Sensor: CLEAR`;
     const cx = w * 0.5;
     const cy = h * 0.5;
 
-    // 4 Wheels
-    const wheels = [
-      { x: cx - 60, y: cy - 45, v: vL },
-      { x: cx - 60, y: cy + 45, v: vL },
-      { x: cx + 60, y: cy - 45, v: vR },
-      { x: cx + 60, y: cy + 45, v: vR }
-    ];
-
-    // Chassis
+    // Vehicle Chassis
     ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2.5;
-    ctx.strokeRect(cx - 45, cy - 35, 90, 70);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - 65, cy - 35, 130, 70);
 
-    wheels.forEach(wh => {
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(wh.x - 12, wh.y - 18, 24, 36);
-      ctx.strokeStyle = '#22c55e';
-      ctx.strokeRect(wh.x - 12, wh.y - 18, 24, 36);
+    // Rear Wheels (Fixed straight)
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(cx - 72, cy - 42, 22, 12);
+    ctx.fillRect(cx - 72, cy + 30, 22, 12);
 
-      // Velocity vectors
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(wh.x, wh.y);
-      ctx.lineTo(wh.x, wh.y - wh.v * 45);
-      ctx.stroke();
-    });
+    // Front Wheels (Steering by deltaDeg)
+    const renderSteerWheel = (wx, wy) => {
+      ctx.save();
+      ctx.translate(wx, wy);
+      ctx.rotate(deltaRad);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(-11, -6, 22, 12);
+      ctx.strokeStyle = '#ffffff';
+      ctx.strokeRect(-11, -6, 22, 12);
+      ctx.restore();
+    };
 
+    renderSteerWheel(cx + 50, cy - 36);
+    renderSteerWheel(cx + 50, cy + 36);
+
+    // Front Bumper / Collision Sensor Bar
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx + 65, cy - 30);
+    ctx.lineTo(cx + 65, cy + 30);
+    ctx.stroke();
+
+    // HUD Info
     ctx.fillStyle = '#22c55e';
     ctx.font = '11px monospace';
-    ctx.fillText(`Left Wheels: ${(vL).toFixed(2)} m/s`, cx - 160, cy);
-    ctx.fillText(`Right Wheels: ${(vR).toFixed(2)} m/s`, cx + 80, cy);
+    ctx.fillText(`Ackermann Steer δ: ${deltaDeg.toFixed(1)}° (Max ±35°)`, cx - 110, cy + 65);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(`Speed PI Loop: vx = ${vx.toFixed(1)} m/s (Throttle: ${(throttle * 100).toFixed(0)}%)`, cx - 130, cy - 55);
   }
 
   // Stage 12: Telemetry & Augmented Path Video Reprojection

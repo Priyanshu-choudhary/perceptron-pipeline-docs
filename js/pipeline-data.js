@@ -681,6 +681,7 @@ def predict_ctrv(x, y, yaw, v, w, dt):
       { topic: "/costmap/inflated", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz / evaluation" },
       { topic: "/costmap/dynamic_risk", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz / evaluation" },
       { topic: "/costmap/combined", type: "nav_msgs/msg/OccupancyGrid (0-100 cost)", rate: "Sensor / track input rate", publisher: "costmap_node", target: "CARLA perception evaluation / visualization" },
+      { topic: "/costmap/nav", type: "nav_msgs/msg/OccupancyGrid", rate: "10 Hz", publisher: "costmap_node", target: "Nav2 local & global costmaps (uninflated lethal + dynamic risk, allows Nav2 footprint inflation)" },
       { topic: "/costmap/voxels", type: "sensor_msgs/msg/PointCloud2", rate: "Sensor / track input rate", publisher: "costmap_node", target: "3D RViz visualization" },
       { topic: "/costmap/stats", type: "std_msgs/msg/Float32MultiArray", rate: "Reported / periodic", publisher: "costmap_node", target: "costmap_eval_node" }
     ],
@@ -695,148 +696,174 @@ combined_grid = np.maximum(inflated_grid, dynamic_risk_grid)`
     id: "stage-10",
     num: 10,
     slug: "stage-10-nav2",
-    title: "Nav2 Planning & Motion Control",
-    badge: "Autonomous Navigation",
+    title: "Nav2 Autonomous Navigation & GPS Route Planning",
+    badge: "Global & Local Autonomy",
     color: "#3b82f6",
     bgGlow: "rgba(59, 130, 246, 0.15)",
-    summary: "High-level path planning and trajectory execution. Nav2 Server manages global path generation (Theta*, Smac) and local control (RotationShim + DWB or MPPI) with traversability awareness.",
+    summary: "Full autonomous navigation pipeline to GPS goals. Features gps_goal_node for datum conversion and lane graph routing, Nav2 Smac Hybrid-A* (Dubins car model with 3m turning radius), Regulated Pure Pursuit, nav2_collision_monitor safety zones, and predictive_speed_limit_node for corridor-crossing yielding.",
     subSteps: [
       {
         step: "10.1",
-        title: "2.5D Elevation Traversability Classification",
-        desc: "traversability_node analyzes terrain step heights, slopes, and negative obstacles (craters) to emit lethal point clouds for costmap ingestion.",
+        title: "GPS-to-Map Datum & Lane-Graph Route Routing",
+        desc: "gps_goal_node projects GPS lat/lon to map via origin datum (19.1334° N, 72.9133° E). Finds shortest route across /carla/map/road_graph lane polylines (with lane change edges, +5m cost) and emits 30m sub-goals to NavigateToPose.",
+        frame: "map",
+        rate: "On Goal / 30m Sub-goals"
+      },
+      {
+        step: "10.2",
+        title: "Nav2 SmacPlannerHybrid (Dubins Car Kinematics)",
+        desc: "Computes kinematically feasible car trajectories with minimum turning radius r = 3.0m on rolling 120m global costmap fed by /costmap/nav. Treats unknown cells as free (0 cost) to eliminate plan timeouts (0.01s vs 0.94s).",
+        frame: "map",
+        rate: "2 Hz Replanning"
+      },
+      {
+        step: "10.3",
+        title: "Predictive Corridor Yielding (predictive_speed_limit_node)",
+        desc: "Checks Stage 7/8 predicted trajectories against the ego corridor. If an object crosses ahead, publishes dynamic speed caps on /speed_limit ensuring the car stops 1.5m short; extends paths until objects clear corridor.",
         frame: "odom",
         rate: "10 Hz"
       },
       {
-        step: "10.2",
-        title: "Global Collision-Free Path Planning",
-        desc: "planner_server calculates optimal geometric path across global costmap using Theta* or SmacPlanner2D with Euclidean heuristic.",
-        frame: "map",
-        rate: "1 Hz / Goal Trigger"
-      },
-      {
-        step: "10.3",
-        title: "Rotation Shim Angular Alignment",
-        desc: "When path deviation angle > 45° (0.785 rad), RotationShimController forces zero linear speed and commands in-place skid rotation first.",
-        frame: "base_link",
-        rate: "20 Hz"
-      },
-      {
         step: "10.4",
-        title: "Model Predictive Path Following (MPPI / DWB)",
-        desc: "Evaluates thousands of sampled trajectories over 32 time steps (dt=0.05s) minimizing cost penalties for obstacle proximity, goal distance, and smooth speed.",
-        frame: "base_link",
+        title: "Regulated Pure Pursuit & Nav2 Collision Monitor",
+        desc: "Tracks path carrot (1.5-6.0m horizon, 1.2s lookahead) at 2.5 m/s cruise. collision_monitor filters /cmd_vel_nav: halts car on LiDAR points within 1.3m stop polygon, and slows to 40% in 5.0m slow polygon.",
+        frame: "base_footprint",
         rate: "20 Hz"
       }
     ],
     nodes: [
       {
-        name: "planner_server",
-        type: "Nav2 Action Server",
-        role: "Computes global /plan from ego pose to goal waypoint.",
-        file: "src/perceptron_navigation/config/nav2_params.yaml"
+        name: "gps_goal_node",
+        type: "GPS & Road Graph Router",
+        role: "Converts GPS coordinates via datum, routes along /carla/map/road_graph, and feeds 30m NavigateToPose sub-goals.",
+        file: "src/perceptron_navigation/perceptron_navigation/gps_goal_node.py"
       },
       {
-        name: "controller_server",
-        type: "Nav2 Action Server",
-        role: "Generates real-time velocity commands /cmd_vel using RotationShimController wrapping DWB or MPPI.",
-        file: "src/perceptron_navigation/config/nav2_params.yaml"
+        name: "predictive_speed_limit_node",
+        type: "Corridor Yielding Node",
+        role: "Monitors predicted object paths against Nav2 plan corridor and publishes /speed_limit to prevent collisions.",
+        file: "src/perceptron_navigation/perceptron_navigation/predictive_speed_limit_node.py"
       },
       {
-        name: "traversability_node",
-        type: "Terrain Analysis Node",
-        role: "Optional terrain analysis node. Its default /points input and /traversability_* outputs form a separate path unless remapped into a navigation costmap.",
-        file: "src/perceptron_navigation/perceptron_navigation/traversability_node.py"
+        name: "planner_server (Smac Hybrid-A*)",
+        type: "Nav2 Action Server",
+        role: "Plans Dubins paths with 3m turning radius on 120m rolling costmap fed by /costmap/nav.",
+        file: "src/perceptron_carla/config/nav2_carla.yaml"
+      },
+      {
+        name: "controller_server (Pure Pursuit)",
+        type: "Nav2 Action Server",
+        role: "Regulated Pure Pursuit controller tracking carrot at 2.5 m/s, yielding via /speed_limit; outputs to /cmd_vel_nav.",
+        file: "src/perceptron_carla/config/nav2_carla.yaml"
+      },
+      {
+        name: "collision_monitor",
+        type: "Safety Watchdog Node",
+        role: "Filters /cmd_vel_nav to /cmd_vel using direct LiDAR point checks in front of the vehicle nose (1.3m stop, 5.0m slow).",
+        file: "src/perceptron_carla/config/nav2_carla.yaml"
       }
     ],
     inputs: [
-      { topic: "/map", type: "nav_msgs/msg/OccupancyGrid", source: "map_server or slam_toolbox" },
-      { topic: "/scan", type: "sensor_msgs/msg/LaserScan", source: "jetson_bridge_node" },
-      { topic: "/odom", type: "nav_msgs/msg/Odometry", source: "jetson_bridge_node / configured odometry source" },
-      { name: "NavigateToPose action goal", type: "geometry_msgs/msg/PoseStamped goal", source: "Operator / mission client" }
+      { topic: "/gps_goal", type: "sensor_msgs/msg/NavSatFix", source: "gps_goal CLI / mission manager" },
+      { topic: "/clicked_point", type: "geometry_msgs/msg/PointStamped", source: "RViz Publish Point click-to-go" },
+      { topic: "/carla/map/road_graph", type: "std_msgs/msg/String (JSON)", source: "carla_bridge lane polylines" },
+      { topic: "/costmap/nav", type: "nav_msgs/msg/OccupancyGrid", source: "costmap_node (lethal + dynamic risk)" },
+      { topic: "/perception/predicted_objects", type: "perceptron_msgs/msg/PredictedObjectArray", source: "trajectory_predictor_node" }
     ],
     outputs: [
-      { topic: "/plan", type: "nav_msgs/msg/Path (global coordinates)", rate: "On plan update", publisher: "planner_server / Nav2 controller path output", target: "Controller and path_overlay_node" },
-      { topic: "/cmd_vel", type: "geometry_msgs/msg/Twist (vx, wz)", rate: "Controller / smoother rate", publisher: "Nav2 controller + velocity_smoother", target: "jetson_bridge_node or stm32_bridge_node (run mode)" }
+      { topic: "/cmd_vel", type: "geometry_msgs/msg/Twist (vx, wz)", rate: "20 Hz", publisher: "collision_monitor (from /cmd_vel_nav)", target: "carla_bridge --control ros / stm32_bridge_node" },
+      { topic: "/plan", type: "nav_msgs/msg/Path", rate: "2 Hz", publisher: "planner_server", target: "controller_server, predictive_speed_limit_node, AR overlay" },
+      { topic: "/speed_limit", type: "nav2_msgs/msg/SpeedLimit", rate: "10 Hz", publisher: "predictive_speed_limit_node", target: "controller_server" },
+      { topic: "/gps_goal/route", type: "nav_msgs/msg/Path", rate: "On goal", publisher: "gps_goal_node", target: "RViz road route display" },
+      { topic: "/gps_goal/status", type: "std_msgs/msg/String (JSON)", rate: "10 Hz", publisher: "gps_goal_node", target: "Mission telemetry & CLI" }
     ],
-    codeSnippet: `# nav2_params.yaml: Controller RotationShim setup for 4-wheel skid-steer
-controller_server:
-  ros__parameters:
-    controller_plugins: ["FollowPath"]
-    FollowPath:
-      plugin: "nav2_rotation_shim_controller::RotationShimController"
-      primary_controller: "dwb_core::DWBLocalPlanner"
-      angular_dist_threshold: 0.785   # 45 deg: beyond this, spin on the spot first
-      forward_sampling_distance: 0.5
-      rotate_to_heading_angular_vel: 0.6`
+    codeSnippet: `# predictive_speed_limit_node.py: Corridor yielding calculation
+# Never reach a spot before a crossing person has cleared it, stop 1.5m short
+def limit_for_crossing(path_ego, obj_predicted_path, gap=1.5, decel=2.0):
+    t_obj_clear, s_corridor = compute_intersection(path_ego, obj_predicted_path)
+    if t_obj_clear is not None:
+        v_max = (s_corridor - gap) / t_obj_clear
+        return min(v_max, math.sqrt(2 * decel * max(0.0, s_corridor - gap)))
+    return 4.0 # unconstrained cruise`
   },
   {
     id: "stage-11",
     num: 11,
     slug: "stage-11-actuators",
-    title: "Actuator Output & Hardware",
-    badge: "Physical Execution",
+    title: "Actuator Output & Vehicle Control",
+    badge: "Vehicle Kinematics & Execution",
     color: "#22c55e",
     bgGlow: "rgba(34, 197, 94, 0.15)",
-    summary: "Translates high-level Twist commands into physical motor torques. stm32_bridge_node packs serial TinyFrames; onboard STM32 executes closed-loop PID velocity control across 4 skid-steer wheels.",
+    summary: "Translates velocity commands (/cmd_vel) into physical vehicle execution across dual backends: CARLA autonomous vehicle control (carla_bridge --control ros with vehicle_control.py: curvature-to-Ackermann steering, speed PI loop, safety watchdog, and collision referee) and physical rover hardware (stm32_bridge_node: TinyFrames serial, 100 Hz PID).",
     subSteps: [
       {
         step: "11.1",
-        title: "Command Velocity Framing",
-        desc: "stm32_bridge_node converts vx (m/s) and wz (rad/s) into 0xA5 0x01 TinyFrames payload with XOR checksum.",
-        frame: "base_link",
-        rate: "20 Hz"
+        title: "Ackermann Curvature Steering (vehicle_control.py)",
+        desc: "Converts Twist (vx, wz) into Ackermann front-wheel angle: curvature kappa = wz / vx, steering delta = atan(L * kappa) with wheelbase L=1.525m. Maps to CARLA steer [-1, 1] clamped to max 35° (2.18m min turning radius).",
+        frame: "base_footprint",
+        rate: "20 Hz (sim tick)"
       },
       {
         step: "11.2",
-        title: "Communication Watchdog Timer",
-        desc: "ECU hardware watchdog shuts off H-bridge PWM drives if no valid /cmd_vel frame is received within 300 ms.",
-        frame: "STM32 Firmware",
-        rate: "Hardware Loop"
+        title: "Speed PI Regulation & Standstill Gear Interlock",
+        desc: "A PI controller (Kp=0.35, Ki=0.25) regulates throttle/brake against measured forward speed. Gear transitions (forward/reverse) enforce a complete vehicle standstill before switching to protect powertrain.",
+        frame: "Vehicle Chassis",
+        rate: "20 Hz"
       },
       {
         step: "11.3",
-        title: "Differential Kinematics & Skid Scrubbing",
-        desc: "Calculates individual left and right track speeds: v_left = vx - (wz * track_width / 2); v_right = vx + (wz * track_width / 2).",
-        frame: "Chassis",
-        rate: "100 Hz"
+        title: "Safety Watchdog & E-Stop Interlock",
+        desc: "Commands full braking if /cmd_vel is older than 0.5s (watchdog timeout) or if /carla/estop is received. Slew limiter caps steering rate to 1.5 units/s and enforces max speed <= 4.0 m/s.",
+        frame: "Watchdog Loop",
+        rate: "Continuous (20 Hz)"
       },
       {
         step: "11.4",
-        title: "Closed-Loop Motor PID Current Regulation",
-        desc: "STM32 microcontroller executes 100 Hz PID loop against encoder feedback, driving high-current MOSFET H-bridges.",
-        frame: "Motor Driver",
-        rate: "100 Hz"
+        title: "Collision Sensor Telemetry & Hardware STM32 Mode",
+        desc: "In CARLA, /carla/ego/collision records any physical actor contact impulses as a referee for benchmark scenarios. On physical rover hardware, stm32_bridge_node sends 0xA5 0x01 TinyFrames to 4-wheel skid-steer H-bridges.",
+        frame: "carla_world / Hardware ECU",
+        rate: "Event / 100 Hz"
       }
     ],
     nodes: [
       {
-        name: "stm32_bridge_node",
-        type: "Hardware Actuator Bridge",
-        role: "Transmits serial motion commands and enforces safety speed limits.",
-        file: "src/perceptron_hardware/perceptron_hardware/stm32_bridge_node.py"
+        name: "carla_bridge (--control ros)",
+        type: "Simulation Control Bridge",
+        role: "Subscribes to /cmd_vel and /carla/estop; drives CARLA vehicle using vehicle_control.py and publishes collision telemetry.",
+        file: "src/perceptron_carla/perceptron_carla/carla_bridge.py"
       },
       {
-        name: "STM32 motor-controller firmware",
-        type: "External embedded firmware",
-        role: "Receives the serial command frame and drives the motor-control hardware. Firmware source is not present in the referenced ROS branch."
+        name: "vehicle_control.py (TwistController)",
+        type: "Vehicle Controller Module",
+        role: "Calculates Ackermann steering angle from curvature, regulates speed PI loop, and enforces watchdog timeouts.",
+        file: "src/perceptron_carla/perceptron_carla/vehicle_control.py"
+      },
+      {
+        name: "stm32_bridge_node",
+        type: "Hardware Actuator Bridge",
+        role: "Transmits serial TinyFrames to physical rover STM32 microcontroller for 4-wheel differential skid-steer driving.",
+        file: "src/perceptron_hardware/perceptron_hardware/stm32_bridge_node.py"
       }
     ],
     inputs: [
-      { topic: "/cmd_vel", type: "geometry_msgs/msg/Twist", source: "Nav2 Controller" }
+      { topic: "/cmd_vel", type: "geometry_msgs/msg/Twist", source: "Nav2 collision_monitor" },
+      { topic: "/carla/estop", type: "std_msgs/msg/Bool", source: "Safety supervisory node / operator" }
     ],
     outputs: [
-      { topic: "UART TX 0xA5 0x01", type: "Serial command frame", rate: "Per /cmd_vel update", publisher: "stm32_bridge_node", target: "STM32 motor-controller firmware" },
-      { topic: "Motor PWM & Direction", type: "Motor-driver signals", rate: "Firmware control loop", publisher: "STM32 motor-controller firmware (external)", target: "Motor drivers and wheels" }
+      { topic: "carla.VehicleControl", type: "CARLA RPC (throttle, steer, brake, reverse)", rate: "20 Hz", publisher: "carla_bridge", target: "CARLA Ego Vehicle Actor" },
+      { topic: "/carla/ego/collision", type: "std_msgs/msg/String (JSON)", rate: "On collision event", publisher: "carla_bridge", target: "scenario_suite referee" },
+      { topic: "UART TX 0xA5 0x01", type: "Serial TinyFrame", rate: "20 Hz", publisher: "stm32_bridge_node", target: "Physical STM32 motor driver" }
     ],
-    codeSnippet: `# stm32_bridge_node.py: Serial Command Framing
-def send_cmd_vel(self, vx: float, wz: float):
-    # Pack linear and angular speed into binary payload
-    payload = struct.pack('<ff', float(vx), float(wz))
-    checksum = calc_xor_checksum(payload)
-    frame = bytes([PROTO_SOF_NEW, FRAME_CMD_VEL, len(payload)]) + payload + bytes([checksum, PROTO_EOF_NEW])
-    self.serial_port.write(frame)`
+    codeSnippet: `# vehicle_control.py: Curvature to Ackermann steering & Speed PI
+# Curvature k = w / v floored at v_min_steer
+d = math.atan(self.L * w_cmd / v_ref) if w_cmd else 0.0
+d = max(-self.max_steer, min(self.max_steer, d))
+target_steer = -d / self.max_wheel_steer
+
+# PI Speed control loop
+err = target_speed - speed
+self.integral = max(-1.0, min(1.0, self.integral + err * dt))
+throttle = self.ff0 + self.ff1 * target_speed + self.kp * err + self.ki * self.integral`
   },
   {
     id: "stage-12",
@@ -922,9 +949,13 @@ export const PIPELINE_TOPIC_CONNECTIONS = [
   { fromStage: 8, toStage: 9, topic: "/perception/predicted_objects", type: "perceptron_msgs/PredictedObjectArray", fromNode: "trajectory_predictor_node", toNode: "costmap_node" },
   { fromStage: 5, toStage: 9, topic: "/perception/points_obstacles and /perception/points_ground", type: "sensor_msgs/msg/PointCloud2", fromNode: "lidar_preprocessor_node", toNode: "costmap_node" },
   { fromStage: 2, toStage: 9, topic: "/odom", type: "nav_msgs/msg/Odometry", fromNode: "jetson_bridge_node / carla_bridge", toNode: "costmap_node" },
+  { fromStage: 9, toStage: 10, topic: "/costmap/nav", type: "nav_msgs/msg/OccupancyGrid", fromNode: "costmap_node", toNode: "planner_server / controller_server costmaps" },
+  { fromStage: 8, toStage: 10, topic: "/perception/predicted_objects", type: "perceptron_msgs/msg/PredictedObjectArray", fromNode: "trajectory_predictor_node", toNode: "predictive_speed_limit_node" },
+  { fromStage: 2, toStage: 10, topic: "/carla/map/road_graph", type: "std_msgs/msg/String", fromNode: "carla_bridge", toNode: "gps_goal_node" },
   { fromStage: 4, toStage: 10, topic: "/map (global occupancy)", type: "nav_msgs/OccupancyGrid", fromNode: "async_slam_toolbox_node / map_server", toNode: "planner_server" },
   { fromStage: 2, toStage: 10, topic: "/scan (hardware navigation path)", type: "sensor_msgs/msg/LaserScan", fromNode: "jetson_bridge_node", toNode: "controller_server" },
-  { fromStage: 10, toStage: 11, topic: "/cmd_vel", type: "geometry_msgs/Twist", fromNode: "controller_server", toNode: "stm32_bridge_node" },
+  { fromStage: 10, toStage: 11, topic: "/cmd_vel", type: "geometry_msgs/Twist", fromNode: "collision_monitor / controller_server", toNode: "carla_bridge --control ros / stm32_bridge_node" },
+  { fromStage: 11, toStage: 10, topic: "/carla/ego/collision", type: "std_msgs/msg/String", fromNode: "carla_bridge", toNode: "scenario referee / evaluation" },
   { fromStage: 10, toStage: 12, topic: "/plan", type: "nav_msgs/Path", fromNode: "planner_server", toNode: "path_overlay_node" },
   { fromStage: 7, toStage: 12, topic: "/perception/track_markers", type: "visualization_msgs/MarkerArray", fromNode: "object_tracker_node", toNode: "RViz / telemetry consumer" }
 ];

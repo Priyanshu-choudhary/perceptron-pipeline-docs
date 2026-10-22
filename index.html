@@ -41,13 +41,13 @@
     <!-- View Mode Switcher: AlgoMaster Graph vs Horizontal Flow -->
     <div class="flex items-center gap-3">
       <div class="view-mode-pill" role="tablist" aria-label="Pipeline layout view switcher">
-        <button type="button" class="view-mode-btn is-active" id="view-mode-algomaster" role="tab" aria-selected="true" title="Top-to-Bottom Giant Graph (AlgoMaster Style)">
-          <span>☲</span>
-          <span>Graph Mode (Top-to-Bottom)</span>
-        </button>
-        <button type="button" class="view-mode-btn" id="view-mode-horizontal" role="tab" aria-selected="false" title="Horizontal Pipeline Track Flow">
+        <button type="button" class="view-mode-btn is-active" id="view-mode-horizontal" role="tab" aria-selected="true" title="Horizontal Pipeline Track Flow (Default)">
           <span>☵</span>
           <span>Horizontal Track</span>
+        </button>
+        <button type="button" class="view-mode-btn" id="view-mode-algomaster" role="tab" aria-selected="false" title="Top-to-Bottom Giant Graph (AlgoMaster Style)">
+          <span>☲</span>
+          <span>Graph Mode (Top-to-Bottom)</span>
         </button>
       </div>
 
@@ -69,17 +69,12 @@
         <h2>Robot System Architecture & Data Flow</h2>
         <p>Complete data pipeline from physical & CARLA simulated sensors to EKF, LiDAR preprocessor, sensor fusion, tracking, trajectory prediction, dynamic costmaps, Nav2, and motor actuation.</p>
       </div>
-      <div class="pipeline-mode-note"><span class="pulse-indicator"></span> AlgoMaster Graph <span>Top-to-Bottom Flow • Continuous Topics</span></div>
+      <div class="pipeline-mode-note"><span class="pulse-indicator"></span> Horizontal Track <span>Interactive Data Flow • Click Stages to Inspect</span></div>
     </div>
   </section>
 
-  <!-- VIEW 1: AlgoMaster Top-to-Bottom Giant Graph (Default Mode) -->
-  <section class="algomaster-graph-section px-4 md:px-6 py-6" id="algomaster-view-container" aria-label="AlgoMaster Top-to-Bottom Graph">
-    <div id="algomaster-pipeline-graph"></div>
-  </section>
-
-  <!-- VIEW 2: Horizontal Flow & Expanded Detail Track (Hidden by default, toggled via switcher) -->
-  <div id="horizontal-view-container" style="display: none;">
+  <!-- VIEW 1: Horizontal Flow & Expanded Detail Track (Default Mode) -->
+  <div id="horizontal-view-container">
     <!-- Horizontal Pipeline Heading -->
     <section class="pipeline-heading px-6">
       <div>
@@ -108,6 +103,11 @@
       <div class="pipeline-track" id="pipeline-track" aria-label="Horizontal robot data pipeline graph"></div>
     </main>
   </div>
+
+  <!-- VIEW 2: AlgoMaster Top-to-Bottom Giant Graph (Toggled via Switcher) -->
+  <section class="algomaster-graph-section px-4 md:px-6 py-6" id="algomaster-view-container" style="display: none;" aria-label="AlgoMaster Top-to-Bottom Graph">
+    <div id="algomaster-pipeline-graph"></div>
+  </section>
 
   <!-- Shared Stage Detail Drawer / Bottom Section -->
   <section class="max-w-7xl mx-auto w-full px-4 md:px-6 py-8" id="stage-detail-wrapper">
