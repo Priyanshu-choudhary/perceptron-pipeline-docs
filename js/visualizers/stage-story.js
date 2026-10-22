@@ -543,21 +543,46 @@ export function mountStageStory(container, stage) {
     ctx.fillText('CTRV Non-Linear Turning Trajectory', cx - 80, cy + 40);
   }
 
-  // Stage 9: Dynamic 3D-Aware Costmap Rasterization
+  // Stage 9: Dynamic 3D-Aware Costmap & Vision Road Layer
   function renderStage09(ctx, w, h, t, cap) {
-    cap.textContent = `Dynamic Costmap: /costmap/nav (Lethal Obstacles + Spatio-Temporal Risk Ribbons for Nav2 Footprint Inflation)`;
+    cap.textContent = `Dynamic Costmap & Road Layer: /costmap/nav (Voxels + Risk Ribbons) & /perception/road_costmap (Road 0, Line 30, Off-road 254)`;
     const cx = w * 0.5;
     const cy = h * 0.5;
 
+    // Vision Road Corridor from road_segmentation_node
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+    ctx.fillRect(cx - 300, cy - 90, 600, 180);
+
+    // Off-road lethal borders (sidewalk/curb, 254)
+    ctx.fillStyle = 'rgba(236, 72, 153, 0.25)';
+    ctx.fillRect(cx - 300, cy - 130, 600, 40);
+    ctx.fillRect(cx - 300, cy + 90, 600, 40);
+
+    ctx.strokeStyle = '#ec4899';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 300, cy - 90); ctx.lineTo(cx + 300, cy - 90);
+    ctx.moveTo(cx - 300, cy + 90); ctx.lineTo(cx + 300, cy + 90);
+    ctx.stroke();
+
+    // Center lane marking (orange dashed line, cost 30)
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([12, 12]);
+    ctx.beginPath();
+    ctx.moveTo(cx - 300, cy); ctx.lineTo(cx + 300, cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
     // Ego Robot Footprint
     ctx.fillStyle = '#00e5ff';
-    ctx.fillRect(cx - 15, cy - 15, 30, 30);
+    ctx.fillRect(cx - 20, cy - 15, 40, 30);
     ctx.strokeStyle = '#00e5ff';
-    ctx.strokeRect(cx - 30, cy - 30, 60, 60);
+    ctx.strokeRect(cx - 35, cy - 25, 70, 50);
 
     // Dynamic obstacle moving with risk corridor
     const obsX = cx + 80 + Math.sin(t * 2) * 50;
-    const obsY = cy - 40;
+    const obsY = cy - 45;
 
     // Layer 3: Risk Corridor Ribbon (Time-to-encounter weighted)
     const g = ctx.createLinearGradient(obsX, obsY, obsX - 90, obsY);
@@ -566,7 +591,7 @@ export function mountStageStory(container, stage) {
     g.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
 
     ctx.fillStyle = g;
-    ctx.fillRect(obsX - 90, obsY - 20, 90, 40);
+    ctx.fillRect(obsX - 90, obsY - 18, 90, 36);
 
     // Layer 1: Raw Lethal Obstacle (Published directly on /costmap/nav)
     ctx.fillStyle = '#ffffff';
@@ -585,69 +610,78 @@ export function mountStageStory(container, stage) {
 
     ctx.fillStyle = '#14b8a6';
     ctx.font = '11px monospace';
-    ctx.fillText('/costmap/nav: Lethal + Dynamic Risk (Nav2 inflates true footprint)', cx - 210, cy + 85);
+    ctx.fillText('/perception/road_costmap: Road (0), Line (30), Off-road (254)', cx - 280, cy - 100);
+    ctx.fillText('/costmap/nav: Lethal Voxels + Dynamic Risk Ribbons', cx - 210, cy + 75);
   }
 
-  // Stage 10: Nav2 Planning, Pure Pursuit & Predictive Yielding
+  // Stage 10: Nav2 Planning, MPPI Controller & Predictive Yielding
   function renderStage10(ctx, w, h, t, cap) {
     const isYielding = Math.sin(t * 1.5) > 0.1;
-    const speed = isYielding ? 0.0 : 2.5;
-    cap.textContent = `Nav2 Smac Hybrid-A* (Dubins r=3.0m) • Pure Pursuit (v=${speed.toFixed(1)} m/s) • Collision Monitor (1.3m / 5.0m) • Predictive Yield: ${isYielding ? 'YIELDING (/speed_limit = 0)' : 'CLEAR'}`;
-    const cx = w * 0.32;
+    const speed = isYielding ? 0.0 : 4.5;
+    cap.textContent = `Nav2 Smac Hybrid-A* (Dubins r=3.0m) • MPPI Controller (800 Rollouts, Ackermann r=2.2m, v=${speed.toFixed(1)} m/s) • Collision Monitor (1.3m / 5.0m) • Predictive Yield: ${isYielding ? 'YIELDING (/speed_limit = 0)' : 'CRUISING'}`;
+    const cx = w * 0.30;
     const cy = h * 0.52;
 
-    // Dubins Path Spline (Green)
-    ctx.strokeStyle = '#10b981';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(cx - 60, cy + 40);
-    ctx.bezierCurveTo(cx + 40, cy + 40, cx + 80, cy - 30, cx + 220, cy - 30);
-    ctx.stroke();
-
-    // Road Route Guide (White dashed)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    // Road Route Guide (White dashed, starting ahead of the car)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 6]);
     ctx.beginPath();
-    ctx.moveTo(cx - 70, cy + 40);
-    ctx.bezierCurveTo(cx + 40, cy + 40, cx + 80, cy - 30, cx + 230, cy - 30);
+    ctx.moveTo(cx - 40, cy + 35);
+    ctx.bezierCurveTo(cx + 40, cy + 35, cx + 90, cy - 30, cx + 240, cy - 30);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Pure Pursuit Lookahead Carrot (Yellow)
-    const carrotX = cx + 90;
-    const carrotY = cy - 25;
-    ctx.fillStyle = '#eab308';
-    ctx.beginPath();
-    ctx.arc(carrotX, carrotY, 5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#eab308';
-    ctx.font = '10px monospace';
-    ctx.fillText('Carrot (1.2s lookahead)', carrotX - 10, carrotY - 10);
+    // MPPI Stochastic Rollout Bundle (800 Trajectory Samples Fan)
+    for (let r = 0; r < 14; r++) {
+      const spread = (r - 7) * 4.5;
+      const noise = Math.sin(t * 3 + r) * 3;
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx + 24, cy + 35);
+      ctx.bezierCurveTo(cx + 70, cy + 35 + spread * 0.4, cx + 110, cy - 25 + spread + noise, cx + 230, cy - 30 + spread * 0.8);
+      ctx.stroke();
+    }
 
-    // Ego Vehicle (Microlino / Rover)
+    // Optimal MPPI Selected Trajectory (Bold Glowing Emerald)
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 3.5;
+    ctx.shadowColor = '#10b981';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(cx + 24, cy + 35);
+    ctx.bezierCurveTo(cx + 60, cy + 35, cx + 100, cy - 28, cx + 240, cy - 30);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Ego Vehicle (Microlino / Rover Body)
     ctx.fillStyle = '#3b82f6';
-    ctx.fillRect(cx - 24, cy + 26, 48, 28);
+    ctx.fillRect(cx - 24, cy + 22, 48, 26);
 
     // Collision Monitor Stop Polygon (1.3m ahead - Red)
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(cx + 24, cy + 28, 26, 24);
+    ctx.strokeRect(cx + 24, cy + 24, 26, 22);
 
     // Collision Monitor Slow Polygon (5.0m ahead - Orange)
     ctx.strokeStyle = '#f59e0b';
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
-    ctx.strokeRect(cx + 24, cy + 22, 65, 36);
+    ctx.strokeRect(cx + 24, cy + 18, 65, 34);
     ctx.setLineDash([]);
 
     // Crossing Pedestrian with Predictive Yield Corridor
-    const pedX = cx + 80;
-    const pedY = isYielding ? cy - 10 : cy - 80;
+    const pedX = cx + 95;
+    const pedY = isYielding ? cy - 5 : cy - 70;
     ctx.fillStyle = '#f43f5e';
     ctx.beginPath();
     ctx.arc(pedX, pedY, 7, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.fillStyle = '#10b981';
+    ctx.font = '10px monospace';
+    ctx.fillText('MPPI Optimal Rollout (800 batch, 8 critics)', cx + 50, cy - 42);
     ctx.font = '10px monospace';
     ctx.fillText('Walker Crossing', pedX - 15, pedY - 12);
 

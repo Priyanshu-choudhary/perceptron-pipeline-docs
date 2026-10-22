@@ -114,8 +114,8 @@
                 <span>Frame: <strong class="text-cyan-400">camera_optical_link</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Monocular Vision Stream</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">Sony IMX219 / Wide-Angle camera capturing 1280x720 RGB frames with calibrated intrinsic matrix K and distortion coefficients D.</p>
+            <h3 class="text-base font-bold text-white mb-1">RGB & Semantic Camera Streams</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Sony IMX219 RGB camera (1280x720) with calibrated intrinsics K and distortion D. In CARLA simulation, carla_bridge also streams /carla/camera/semantic (mono8 class IDs) and depth (/carla/camera/depth) for vision road segmentation and sensor fusion.</p>
           </div>
         
       </div>
@@ -201,11 +201,29 @@
           
             <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
               <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
-                <span>/camera/image_raw</span>
+                <span>/camera/image_raw (or /carla/camera/image_raw)</span>
                 <span class="text-[10px] text-slate-400">15-30 Hz</span>
               </div>
-              <div class="text-[11px] text-slate-400">sensor_msgs/msg/Image (1280x720 BGR8)</div>
-              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Jetson Pipeline / 2D Detector</div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/Image (1280x720 RGB8)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Jetson Pipeline / 2D Detector / Object Fusion</div>
+            </div>
+
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/carla/camera/semantic</span>
+                <span class="text-[10px] text-slate-400">15-30 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/Image (mono8 class labels)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: road_segmentation_node (Vision Road Costmap)</div>
+            </div>
+
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/carla/ego/collision</span>
+                <span class="text-[10px] text-slate-400">On Contact</span>
+              </div>
+              <div class="text-[11px] text-slate-400">std_msgs/msg/String (JSON collision telemetry)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: scenario_suite benchmark referee</div>
             </div>
           
         </div>

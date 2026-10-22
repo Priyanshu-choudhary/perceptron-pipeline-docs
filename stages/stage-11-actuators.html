@@ -67,7 +67,7 @@
               </div>
             </div>
             <h3 class="text-base font-bold text-white mb-1">Ackermann Curvature Steering (vehicle_control.py)</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">Converts Twist (vx, wz) into Ackermann front-wheel angle: curvature kappa = wz / vx, steering delta = atan(L * kappa) with wheelbase L=1.525m. Maps to CARLA steer [-1, 1] clamped to max 35° (2.18m min turning radius).</p>
+            <p class="text-sm text-slate-300 leading-relaxed">Converts Twist (vx, wz) into Ackermann front-wheel angle: curvature kappa = wz / vx, steering delta = atan(L * kappa) with wheelbase L=1.525m. Maps to CARLA steer [-1, 1] clamped to max 35° (2.18m / 2.2m min turning radius).</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
@@ -91,7 +91,7 @@
               </div>
             </div>
             <h3 class="text-base font-bold text-white mb-1">Safety Watchdog & E-Stop Interlock</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">Commands full braking if /cmd_vel is older than 0.5s (watchdog timeout) or if /carla/estop is received. Slew limiter caps steering rate to 1.5 units/s and enforces max speed <= 4.0 m/s.</p>
+            <p class="text-sm text-slate-300 leading-relaxed">Commands full braking if /cmd_vel is older than 0.5s (watchdog timeout) or if /carla/estop is received. Slew limiter caps steering rate to 1.5 units/s and enforces max speed <= 5.0 m/s.</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">

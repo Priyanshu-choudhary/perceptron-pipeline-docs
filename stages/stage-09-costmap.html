@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stage 9: 3D-Aware Dynamic Costmap — Project Perceptron Pipeline</title>
+  <title>Stage 9: 3D-Aware Dynamic Costmap & Vision Road Layer — Project Perceptron Pipeline</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,13 +40,13 @@
     <div class="mb-6">
       <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
             style="background: #14b8a620; color: #14b8a6; border: 1px solid #14b8a660">
-        Stage 09 • Spatial Risk Modeling
+        Stage 09 • Spatial Risk & Road Modeling
       </span>
       <h1 class="text-3xl md:text-5xl font-black text-white mt-3 mb-4">
-        3D-Aware Dynamic Costmap
+        3D-Aware Dynamic Costmap & Vision Road Layer
       </h1>
       <p class="text-base text-slate-300 leading-relaxed">
-        Synthesizes a rolling 3-layer 2D/3D costmap in odom frame: Layer 1 Voxel Height Obstacles, Layer 2 Inscribed Inflation, and Layer 3 Dynamic Spatio-Temporal Risk Ribbons.
+        Synthesizes a rolling 3-layer 2D/3D obstacle costmap in odom frame (Layer 1 Voxel Height Obstacles, Layer 2 Inscribed Inflation, Layer 3 Dynamic Spatio-Temporal Risk Ribbons) and a parallel Vision Road Layer (/perception/road_costmap) from camera semantic segmentation that paints off-road areas as lethal to keep Nav2 on the drivable road.
       </p>
     </div>
 
@@ -102,8 +102,20 @@
                 <span>Frame: <strong class="text-cyan-400">odom</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Layer 4: Cell Fusion & Maximum Pooling</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">Combines Layer 2 and Layer 3 via max-pooling: combined_cost(x, y) = max(inflated_cost(x, y), dynamic_risk_cost(x, y)).</p>
+            <h3 class="text-base font-bold text-white mb-1">Layer 4: Cell Fusion & Maximum Pooling (/costmap/nav)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Combines Layer 2 and Layer 3 via max-pooling: combined_cost(x, y) = max(inflated_cost(x, y), dynamic_risk_cost(x, y)). Emits uninflated lethal obstacles and risk ribbons on /costmap/nav so Nav2 inflates with the robot's real footprint.</p>
+          </div>
+
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 9.5</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Layer 5: Vision Road & Lane-Line Map (road_segmentation_node)</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Projects camera semantic segmentation onto the ground plane using calibrated ray intersection (projection: ground, stride: 2). Assigns road (0 cost), lane markings (30 cost), and off-road surfaces (254 lethal in blobs &ge; 4 cells after 3 consecutive votes, max height 0.5m). Published on /perception/road_costmap as a Nav2 StaticLayer.</p>
           </div>
         
       </div>
@@ -148,6 +160,36 @@
                 </a>
               
             </div>
+
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">road_segmentation_node</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Vision Road Costmap Node</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Builds rolling 0.2m road costmap and colored point cloud in odom from semantic segmentation, keeping Nav2 on drivable surfaces.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_perception/perceptron_perception/road_segmentation_node.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_perception/perceptron_perception/road_segmentation_node.py</span> ↗
+                </a>
+              
+            </div>
+
+            <div class="border-b border-slate-800/80 pb-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-white font-mono">road_segmentation.py</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Road Geometry Library</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Flat-ground ray intersection and temporal multi-vote occupancy grid with height culling against tree crowns.</p>
+              
+                <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_perception/perceptron_perception/road_segmentation.py" 
+                   target="_blank" 
+                   class="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1">
+                  <span>src/perceptron_perception/perceptron_perception/road_segmentation.py</span> ↗
+                </a>
+              
+            </div>
           
         </div>
       </div>
@@ -166,7 +208,25 @@
                 <span class="text-[10px] text-slate-400">10 Hz</span>
               </div>
               <div class="text-[11px] text-slate-400">nav_msgs/msg/OccupancyGrid (raw lethal + dynamic risk)</div>
-              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Nav2 Local & Global Costmaps (Inflates with true vehicle footprint)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Nav2 Local & Global Costmaps (perception_layer)</div>
+            </div>
+
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/perception/road_costmap</span>
+                <span class="text-[10px] text-slate-400">5-10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">nav_msgs/msg/OccupancyGrid (road: 0, line: 30, off-road: 254)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: Nav2 Local & Global Costmaps (road_layer: StaticLayer, max)</div>
+            </div>
+
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
+              <div class="flex items-center justify-between text-cyan-300 font-bold mb-1">
+                <span>/perception/road_cloud</span>
+                <span class="text-[10px] text-slate-400">5-10 Hz</span>
+              </div>
+              <div class="text-[11px] text-slate-400">sensor_msgs/msg/PointCloud2 (RGB colored cells in odom)</div>
+              <div class="text-[10px] text-emerald-400 mt-1">Consumer: RViz 3D Road & Lane Visualizer</div>
             </div>
 
             <div class="bg-slate-950/70 border border-slate-800/80 rounded-lg p-3">
@@ -206,9 +266,16 @@
         <span class="w-2 h-2 rounded-full bg-purple-400"></span>
         Core Algorithmic Implementation
       </h3>
-      <pre class="code-container p-5"><code># costmap.py: Dynamic Risk Ribbon Stamping
-# Predicted paths are stamped as lethal ribbons along the path, with risk falling
-# with time-to-encounter so immediate collisions are lethal while 2s paths allow navigation
+      <pre class="code-container p-5"><code># road_segmentation_node.py: Vision road costmap generation
+# Intersects pixel rays with ground plane (projection: ground), builds temporal vote map
+pts, ok = rs.ground_intersect(u.astype(float), v.astype(float), self.K, M_base_opt)
+ok &= np.hypot(pts[:, 0] - M_base_opt[0, 3], pts[:, 1] - M_base_opt[1, 3]) < self.max_range
+xyz, lab = cp.transform_points(robot, pts[ok]), lab[ok]
+
+# Emit road costmap: road 0, lane line 30, off-road 254 (lethal in blobs >= 4 cells after 3 votes)
+cost_grid = self.map.to_costmap(out_res=0.2, min_votes=3, min_blob=4)
+
+# costmap.py: Dynamic Risk Ribbon Stamping
 risk_weight = np.clip(1.0 - (t_encounter / max_horizon), 0.3, 1.0)
 cost_cell = int(90 * risk_weight * np.exp(-0.5 * (d_lateral / sigma)**2))
 combined_grid = np.maximum(inflated_grid, dynamic_risk_grid)</code></pre>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stage 10: Nav2 Planning & Motion Control — Project Perceptron Pipeline</title>
+  <title>Stage 10: Nav2 Planning & MPPI Motion Control — Project Perceptron Pipeline</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,13 +40,13 @@
     <div class="mb-6">
       <span class="text-xs font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider" 
             style="background: #3b82f620; color: #3b82f6; border: 1px solid #3b82f660">
-        Stage 10 • Autonomous Navigation & GPS Routing
+        Stage 10 • Autonomous Navigation & MPPI Motion Control
       </span>
       <h1 class="text-3xl md:text-5xl font-black text-white mt-3 mb-4">
-        Nav2 Planning & Motion Control
+        Nav2 Planning & MPPI Motion Control
       </h1>
       <p class="text-base text-slate-300 leading-relaxed">
-        Full autonomous navigation pipeline to GPS goals. Features gps_goal_node for datum conversion and lane graph routing, Nav2 Smac Hybrid-A* (Dubins car model with 3m turning radius), Regulated Pure Pursuit, nav2_collision_monitor safety zones, and predictive_speed_limit_node for corridor-crossing yielding.
+        Full autonomous navigation pipeline to GPS goals. Features gps_goal_node for datum conversion and lane graph routing (starting 2-15m ahead to eliminate kerb-locked U-turns), Nav2 Smac Hybrid-A* (Dubins car model with 3m turning radius), Model Predictive Path Integral (MPPI) Controller with Ackermann kinematics (800 sample rollouts, 32 timesteps, 8 critics, 5.0 m/s max speed), nav2_collision_monitor safety zones, and predictive_speed_limit_node for corridor-crossing yielding.
       </p>
     </div>
 
@@ -67,7 +67,7 @@
               </div>
             </div>
             <h3 class="text-base font-bold text-white mb-1">GPS-to-Map Datum & Lane-Graph Route Routing</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">gps_goal_node projects GPS lat/lon to map via origin datum (19.1334° N, 72.9133° E). Finds shortest route across /carla/map/road_graph lane polylines (with lane change edges, +5m cost) and emits 30m sub-goals to NavigateToPose.</p>
+            <p class="text-sm text-slate-300 leading-relaxed">gps_goal_node projects GPS lat/lon to map via origin datum (19.1334° N, 72.9133° E). Finds shortest route across /carla/map/road_graph lane polylines (with lane change edges, +5m cost) starting 2-15m ahead of the car (preventing impossible U-turns between lethal curbs) and emits 30m sub-goals to NavigateToPose.</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
@@ -91,7 +91,7 @@
               </div>
             </div>
             <h3 class="text-base font-bold text-white mb-1">Predictive Corridor Yielding (predictive_speed_limit_node)</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">Checks Stage 7/8 predicted trajectories against the ego corridor. If an object crosses ahead, publishes dynamic speed caps on /speed_limit ensuring the car stops 1.5m short; extends paths until objects clear corridor.</p>
+            <p class="text-sm text-slate-300 leading-relaxed">Checks Stage 7/8 predicted trajectories against the ego corridor. If an object crosses ahead, publishes dynamic speed caps on /speed_limit (release speed 5.0 m/s) ensuring the car stops 1.5m short; extends paths at terminal velocity until objects clear the corridor.</p>
           </div>
         
           <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
@@ -102,8 +102,20 @@
                 <span>Frame: <strong class="text-cyan-400">base_footprint</strong></span>
               </div>
             </div>
-            <h3 class="text-base font-bold text-white mb-1">Regulated Pure Pursuit & Nav2 Collision Monitor</h3>
-            <p class="text-sm text-slate-300 leading-relaxed">Tracks path carrot (1.5-6.0m horizon, 1.2s lookahead) at 2.5 m/s cruise. collision_monitor filters /cmd_vel_nav: halts car on LiDAR points within 1.3m stop polygon, and slows to 40% in 5.0m slow polygon.</p>
+            <h3 class="text-base font-bold text-white mb-1">Nav2 MPPI Controller & Collision Monitor</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Executes Model Predictive Path Integral (MPPI) control sampling 800 stochastic candidate trajectories over 32 timesteps (dt=0.05s) with Ackermann kinematics (min turning radius 2.2m, max speed 5.0 m/s) scored across 8 critics (Constraint, Cost, Goal, GoalAngle, PathAlign, PathFollow, PathAngle, PreferForward). collision_monitor provides fail-safe braking on obstacle points (1.3m stop, 5.0m slow polygon).</p>
+          </div>
+
+          <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400">Step 10.5</span>
+              <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <span>Rate: <strong class="text-emerald-400">10 Hz / 4 Hz</strong></span>
+                <span>Frame: <strong class="text-cyan-400">odom / map</strong></span>
+              </div>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1">Multi-Layer Nav2 Costmap Fusion</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">Both local (30x30m) and global (120x120m) costmaps combine perception_layer (/costmap/nav lethal obstacles & dynamic risk), road_layer (/perception/road_costmap off-road lethal), and vehicle footprint inflation (inscribed radius 0.75m, inflation radius 1.8m), treating unknown space as free to achieve 0.01s plan times.</p>
           </div>
         
       </div>
@@ -166,10 +178,10 @@
           
             <div class="border-b border-slate-800/80 pb-3">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold text-white font-mono">controller_server (Pure Pursuit)</span>
+                <span class="text-sm font-bold text-white font-mono">controller_server (MPPI Controller)</span>
                 <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">Nav2 Action Server</span>
               </div>
-              <p class="text-xs text-slate-400 mt-1 mb-2">Regulated Pure Pursuit controller tracking carrot at 2.5 m/s, yielding via /speed_limit; outputs to /cmd_vel_nav.</p>
+              <p class="text-xs text-slate-400 mt-1 mb-2">Model Predictive Path Integral (MPPI) controller optimizing 800 Ackermann rollouts against costmap and plan (Ackermann min_turning_r 2.2m, max speed 5.0 m/s, 8 critics); supports Regulated Pure Pursuit as fallback.</p>
               
                 <a href="https://github.com/Priyanshu-choudhary/Perceptron_Ros2_Jetson_local/blob/feature/carla-sim-perception/src/perceptron_carla/config/nav2_carla.yaml" 
                    target="_blank" 
@@ -251,14 +263,30 @@
         <span class="w-2 h-2 rounded-full bg-purple-400"></span>
         Core Algorithmic Implementation
       </h3>
-      <pre class="code-container p-5"><code># predictive_speed_limit_node.py: Corridor yielding calculation
-# Never reach a spot before a crossing person has cleared it, stop 1.5m short
+      <pre class="code-container p-5"><code># nav2_carla.yaml: Nav2 MPPI Controller with Ackermann Kinematics
+FollowPath:
+  plugin: "nav2_mppi_controller::MPPIController"
+  time_steps: 32
+  model_dt: 0.05
+  batch_size: 800
+  vx_max: 5.0
+  wz_max: 1.8
+  motion_model: "Ackermann"
+  AckermannConstraints:
+    min_turning_r: 2.2
+  critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic",
+            "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
+  CostCritic:
+    cost_weight: 3.8
+    collision_cost: 1000000.0
+
+# predictive_speed_limit_node.py: Corridor yielding calculation
 def limit_for_crossing(path_ego, obj_predicted_path, gap=1.5, decel=2.0):
     t_obj_clear, s_corridor = compute_intersection(path_ego, obj_predicted_path)
     if t_obj_clear is not None:
         v_max = (s_corridor - gap) / t_obj_clear
         return min(v_max, math.sqrt(2 * decel * max(0.0, s_corridor - gap)))
-    return 4.0 # unconstrained cruise</code></pre>
+    return 5.0 # release speed</code></pre>
     </section>
 
     <!-- Bottom Navigation -->

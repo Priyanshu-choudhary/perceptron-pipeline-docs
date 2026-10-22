@@ -45,8 +45,8 @@ export const PIPELINE_STAGES = [
       },
       {
         step: "1.5",
-        title: "Camera stream",
-        desc: "CARLA publishes camera images and intrinsics for simulation perception. On the physical robot, the host camera bridge is activated for docking.",
+        title: "Camera & Semantic streams",
+        desc: "CARLA publishes RGB (/carla/camera/image_raw), mono8 class IDs (/carla/camera/semantic), and depth for perception and road mapping. On the physical robot, the host camera bridge is activated for docking.",
         frame: "camera_optical_link",
         rate: "15-30 Hz"
       }
@@ -61,7 +61,7 @@ export const PIPELINE_STAGES = [
       {
         name: "CARLA sensor actors",
         type: "Simulation source",
-        role: "CARLA sensor sources and simulated wheel / IMU / GNSS readings; carla_bridge publishes their ROS messages in Stage 02.",
+        role: "CARLA sensor sources (LiDAR, RGB, semantic, depth, IMU, GNSS, collision sensor, road graph); carla_bridge publishes their ROS messages in Stage 02.",
         file: "src/perceptron_carla/perceptron_carla/sim_sensors.py"
       }
     ],
@@ -621,11 +621,11 @@ def predict_ctrv(x, y, yaw, v, w, dt):
     id: "stage-09",
     num: 9,
     slug: "stage-09-costmap",
-    title: "3D-Aware Dynamic Costmap",
-    badge: "Spatial Risk Modeling",
+    title: "3D-Aware Dynamic Costmap & Vision Road Layer",
+    badge: "Spatial Risk & Road Modeling",
     color: "#14b8a6",
     bgGlow: "rgba(20, 184, 166, 0.15)",
-    summary: "Synthesizes a rolling 3-layer 2D/3D costmap in odom frame: Layer 1 Voxel Height Obstacles, Layer 2 Inscribed Inflation, and Layer 3 Dynamic Spatio-Temporal Risk Ribbons.",
+    summary: "Synthesizes a rolling 3-layer 2D/3D obstacle costmap in odom frame (Layer 1 Voxel Height Obstacles, Layer 2 Inscribed Inflation, Layer 3 Dynamic Spatio-Temporal Risk Ribbons) and a parallel Vision Road Layer (/perception/road_costmap) from camera semantic segmentation that paints off-road areas as lethal to keep Nav2 on the drivable road.",
     subSteps: [
       {
         step: "9.1",
@@ -651,7 +651,14 @@ def predict_ctrv(x, y, yaw, v, w, dt):
       {
         step: "9.4",
         title: "Layer 4: Cell Fusion & Maximum Pooling",
-        desc: "Combines Layer 2 and Layer 3 via max-pooling: combined_cost(x, y) = max(inflated_cost(x, y), dynamic_risk_cost(x, y)).",
+        desc: "Combines Layer 2 and Layer 3 via max-pooling: combined_cost(x, y) = max(inflated_cost(x, y), dynamic_risk_cost(x, y)); emits /costmap/nav (lethal + dynamic risk) for Nav2.",
+        frame: "odom",
+        rate: "10 Hz"
+      },
+      {
+        step: "9.5",
+        title: "Layer 5: Vision Road & Lane-Line Map (road_segmentation_node)",
+        desc: "Projects camera semantic pixels via flat-ground ray intersection (projection: ground, stride: 2); maps road (0 cost), lane line (30 cost), and off-road (254 lethal in blobs >= 4 cells after 3 votes, max height 0.5m). Feeds Nav2 local & global costmaps as road_layer.",
         frame: "odom",
         rate: "10 Hz"
       }
@@ -660,100 +667,113 @@ def predict_ctrv(x, y, yaw, v, w, dt):
       {
         name: "costmap_node",
         type: "Costmap Generator",
-        role: "Maintains rolling costmaps centered on ego vehicle; incorporates moving obstacle predictions directly into Nav2 cost.",
+        role: "Maintains rolling 3D voxel obstacle costmaps centered on ego vehicle; incorporates moving obstacle predictions directly into Nav2 cost.",
         file: "src/perceptron_perception/perceptron_perception/costmap_node.py"
       },
       {
         name: "costmap.py",
         type: "Rasterization Engine",
-        role: "Accelerated NumPy array voxel projection, Euclidean distance transform, and ribbon stamping.",
+        role: "Accelerated NumPy array voxel projection, Euclidean distance transform, and dynamic risk ribbon stamping.",
         file: "src/perceptron_perception/perceptron_perception/costmap.py"
+      },
+      {
+        name: "road_segmentation_node",
+        type: "Vision Road Costmap Node",
+        role: "Builds rolling 0.2m road costmap and colored point cloud in odom from semantic segmentation, keeping Nav2 on drivable surfaces.",
+        file: "src/perceptron_perception/perceptron_perception/road_segmentation_node.py"
+      },
+      {
+        name: "road_segmentation.py",
+        type: "Road Geometry Library",
+        role: "Flat-ground ray intersection and temporal multi-vote occupancy grid with height culling against tree crowns.",
+        file: "src/perceptron_perception/perceptron_perception/road_segmentation.py"
       }
     ],
     inputs: [
       { topic: "/perception/points_obstacles", type: "sensor_msgs/msg/PointCloud2", source: "lidar_preprocessor_node" },
       { topic: "/perception/points_ground", type: "sensor_msgs/msg/PointCloud2", source: "lidar_preprocessor_node" },
       { topic: "/perception/predicted_objects", type: "perceptron_msgs/msg/PredictedObjectArray", source: "Trajectory Predictor" },
-      { topic: "/odom", type: "nav_msgs/msg/Odometry", source: "Hardware bridge / CARLA bridge" }
+      { topic: "/odom", type: "nav_msgs/msg/Odometry", source: "Hardware bridge / CARLA bridge" },
+      { topic: "/carla/camera/semantic", type: "sensor_msgs/msg/Image (mono8)", source: "carla_bridge (semantic camera)" },
+      { topic: "/carla/camera/camera_info", type: "sensor_msgs/msg/CameraInfo", source: "carla_bridge" }
     ],
     outputs: [
-      { topic: "/costmap/obstacles", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz / evaluation" },
-      { topic: "/costmap/inflated", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz / evaluation" },
-      { topic: "/costmap/dynamic_risk", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz / evaluation" },
-      { topic: "/costmap/combined", type: "nav_msgs/msg/OccupancyGrid (0-100 cost)", rate: "Sensor / track input rate", publisher: "costmap_node", target: "CARLA perception evaluation / visualization" },
       { topic: "/costmap/nav", type: "nav_msgs/msg/OccupancyGrid", rate: "10 Hz", publisher: "costmap_node", target: "Nav2 local & global costmaps (uninflated lethal + dynamic risk, allows Nav2 footprint inflation)" },
+      { topic: "/perception/road_costmap", type: "nav_msgs/msg/OccupancyGrid (0-254 cost)", rate: "5-10 Hz", publisher: "road_segmentation_node", target: "Nav2 local & global costmaps (road_layer: road 0, lane line 30, off-road 254)" },
+      { topic: "/perception/road_cloud", type: "sensor_msgs/msg/PointCloud2 (RGB)", rate: "5-10 Hz", publisher: "road_segmentation_node", target: "RViz road & lane display" },
+      { topic: "/costmap/combined", type: "nav_msgs/msg/OccupancyGrid (0-100 cost)", rate: "Sensor / track input rate", publisher: "costmap_node", target: "CARLA perception evaluation / visualization" },
+      { topic: "/costmap/dynamic_risk", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz & evaluation" },
+      { topic: "/costmap/obstacles", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz & evaluation" },
+      { topic: "/costmap/inflated", type: "nav_msgs/msg/OccupancyGrid", rate: "Sensor / track input rate", publisher: "costmap_node", target: "RViz & evaluation" },
       { topic: "/costmap/voxels", type: "sensor_msgs/msg/PointCloud2", rate: "Sensor / track input rate", publisher: "costmap_node", target: "3D RViz visualization" },
-      { topic: "/costmap/stats", type: "std_msgs/msg/Float32MultiArray", rate: "Reported / periodic", publisher: "costmap_node", target: "costmap_eval_node" }
+      { topic: "/costmap/stats", type: "std_msgs/msg/Float32MultiArray", rate: "Reported / periodic", publisher: "costmap_node", target: "costmap_eval_node" },
+      { topic: "/perception/road_stats", type: "std_msgs/msg/Float32MultiArray", rate: "Reported / periodic", publisher: "road_segmentation_node", target: "Road map diagnostics" }
     ],
-    codeSnippet: `# costmap.py: Dynamic Risk Ribbon Stamping
-# Predicted paths are stamped as lethal ribbons along the path, with risk falling
-# with time-to-encounter so immediate collisions are lethal while 2s paths allow navigation
-risk_weight = np.clip(1.0 - (t_encounter / max_horizon), 0.3, 1.0)
-cost_cell = int(90 * risk_weight * np.exp(-0.5 * (d_lateral / sigma)**2))
-combined_grid = np.maximum(inflated_grid, dynamic_risk_grid)`
+    codeSnippet: `# road_segmentation_node.py: Vision road costmap generation
+# Intersect pixel rays with ground plane (projection: ground), build temporal vote map
+pts, ok = rs.ground_intersect(u.astype(float), v.astype(float), self.K, M_base_opt)
+ok &= np.hypot(pts[:, 0] - M_base_opt[0, 3], pts[:, 1] - M_base_opt[1, 3]) < self.max_range
+xyz, lab = cp.transform_points(robot, pts[ok]), lab[ok]
+# Emit road costmap: road 0, lane line 30, off-road 254 (lethal in blobs >= 4 cells after 3 votes)
+cost_grid = self.map.to_costmap(out_res=0.2, min_votes=3, min_blob=4)`
   },
   {
     id: "stage-10",
     num: 10,
     slug: "stage-10-nav2",
-    title: "Nav2 Autonomous Navigation & GPS Route Planning",
+    title: "Nav2 Autonomous Navigation & MPPI Motion Control",
     badge: "Global & Local Autonomy",
     color: "#3b82f6",
     bgGlow: "rgba(59, 130, 246, 0.15)",
-    summary: "Full autonomous navigation pipeline to GPS goals. Features gps_goal_node for datum conversion and lane graph routing, Nav2 Smac Hybrid-A* (Dubins car model with 3m turning radius), Regulated Pure Pursuit, nav2_collision_monitor safety zones, and predictive_speed_limit_node for corridor-crossing yielding.",
+    summary: "Full autonomous navigation pipeline to GPS goals. Features gps_goal_node for datum conversion and lane graph routing (starting 2-15m ahead to eliminate kerb-locked U-turns), Nav2 Smac Hybrid-A* (Dubins car model with 3m turning radius), Model Predictive Path Integral (MPPI) Controller with Ackermann kinematics (800 sample rollouts, 32 timesteps, 8 critics, 5.0 m/s max speed), nav2_collision_monitor safety zones, and predictive_speed_limit_node for corridor-crossing yielding.",
     subSteps: [
       {
         step: "10.1",
         title: "GPS-to-Map Datum & Lane-Graph Route Routing",
-        desc: "gps_goal_node projects GPS lat/lon to map via origin datum (19.1334° N, 72.9133° E). Finds shortest route across /carla/map/road_graph lane polylines (with lane change edges, +5m cost) and emits 30m sub-goals to NavigateToPose.",
+        desc: "gps_goal_node projects GPS lat/lon to map via origin datum (19.1334° N, 72.9133° E). Finds shortest route across /carla/map/road_graph lane polylines (with lane change edges, +5m cost) starting 2-15m ahead of vehicle and emits 30m sub-goals to NavigateToPose.",
         frame: "map",
         rate: "On Goal / 30m Sub-goals"
       },
       {
         step: "10.2",
         title: "Nav2 SmacPlannerHybrid (Dubins Car Kinematics)",
-        desc: "Computes kinematically feasible car trajectories with minimum turning radius r = 3.0m on rolling 120m global costmap fed by /costmap/nav. Treats unknown cells as free (0 cost) to eliminate plan timeouts (0.01s vs 0.94s).",
+        desc: "Computes kinematically feasible car trajectories with minimum turning radius r = 3.0m on rolling 120m global costmap fed by /costmap/nav and /perception/road_costmap. Treats unknown cells as free (0 cost) to eliminate plan timeouts (0.01s vs 0.94s).",
         frame: "map",
         rate: "2 Hz Replanning"
       },
       {
         step: "10.3",
         title: "Predictive Corridor Yielding (predictive_speed_limit_node)",
-        desc: "Checks Stage 7/8 predicted trajectories against the ego corridor. If an object crosses ahead, publishes dynamic speed caps on /speed_limit ensuring the car stops 1.5m short; extends paths until objects clear corridor.",
+        desc: "Checks Stage 7/8 predicted trajectories against the ego corridor. If an object crosses ahead, publishes dynamic speed caps on /speed_limit (release speed 5.0 m/s) ensuring the car stops 1.5m short; extends paths until objects clear corridor.",
         frame: "odom",
         rate: "10 Hz"
       },
       {
         step: "10.4",
-        title: "Regulated Pure Pursuit & Nav2 Collision Monitor",
-        desc: "Tracks path carrot (1.5-6.0m horizon, 1.2s lookahead) at 2.5 m/s cruise. collision_monitor filters /cmd_vel_nav: halts car on LiDAR points within 1.3m stop polygon, and slows to 40% in 5.0m slow polygon.",
+        title: "Nav2 MPPI Controller & Collision Monitor",
+        desc: "Executes Model Predictive Path Integral (MPPI) control sampling 800 stochastic candidate trajectories over 32 timesteps (dt=0.05s) with Ackermann kinematics (min turning radius 2.2m, max speed 5.0 m/s) scored across 8 critics. collision_monitor enforces hard safety stops (1.3m stop, 5.0m slow polygon).",
         frame: "base_footprint",
         rate: "20 Hz"
+      },
+      {
+        step: "10.5",
+        title: "Multi-Layer Nav2 Costmap Fusion",
+        desc: "Both local (30x30m) and global (120x120m) costmaps fuse perception_layer (/costmap/nav lethal obstacles & dynamic risk), road_layer (/perception/road_costmap off-road lethal), and vehicle footprint inflation (inscribed radius 0.75m, inflation radius 1.8m).",
+        frame: "odom / map",
+        rate: "10 Hz / 4 Hz"
       }
     ],
     nodes: [
       {
-        name: "gps_goal_node",
-        type: "GPS & Road Graph Router",
-        role: "Converts GPS coordinates via datum, routes along /carla/map/road_graph, and feeds 30m NavigateToPose sub-goals.",
-        file: "src/perceptron_navigation/perceptron_navigation/gps_goal_node.py"
-      },
-      {
-        name: "predictive_speed_limit_node",
-        type: "Corridor Yielding Node",
-        role: "Monitors predicted object paths against Nav2 plan corridor and publishes /speed_limit to prevent collisions.",
-        file: "src/perceptron_navigation/perceptron_navigation/predictive_speed_limit_node.py"
+        name: "controller_server (MPPI Controller)",
+        type: "Nav2 Action Server",
+        role: "MPPI controller optimizing 800 Ackermann rollouts against costmap and plan (Ackermann min_turning_r 2.2m, max speed 5.0 m/s, 8 critics); supports Regulated Pure Pursuit as fallback.",
+        file: "src/perceptron_carla/config/nav2_carla.yaml"
       },
       {
         name: "planner_server (Smac Hybrid-A*)",
         type: "Nav2 Action Server",
-        role: "Plans Dubins paths with 3m turning radius on 120m rolling costmap fed by /costmap/nav.",
-        file: "src/perceptron_carla/config/nav2_carla.yaml"
-      },
-      {
-        name: "controller_server (Pure Pursuit)",
-        type: "Nav2 Action Server",
-        role: "Regulated Pure Pursuit controller tracking carrot at 2.5 m/s, yielding via /speed_limit; outputs to /cmd_vel_nav.",
+        role: "Plans Dubins paths with 3m turning radius on 120m rolling costmap fed by /costmap/nav and /perception/road_costmap.",
         file: "src/perceptron_carla/config/nav2_carla.yaml"
       },
       {
@@ -761,6 +781,18 @@ combined_grid = np.maximum(inflated_grid, dynamic_risk_grid)`
         type: "Safety Watchdog Node",
         role: "Filters /cmd_vel_nav to /cmd_vel using direct LiDAR point checks in front of the vehicle nose (1.3m stop, 5.0m slow).",
         file: "src/perceptron_carla/config/nav2_carla.yaml"
+      },
+      {
+        name: "predictive_speed_limit_node",
+        type: "Corridor Yielding Node",
+        role: "Monitors predicted object paths against Nav2 plan corridor and publishes /speed_limit up to 5.0 m/s to prevent collisions.",
+        file: "src/perceptron_navigation/perceptron_navigation/predictive_speed_limit_node.py"
+      },
+      {
+        name: "gps_goal_node",
+        type: "GPS & Road Graph Router",
+        role: "Converts GPS coordinates via datum, routes along /carla/map/road_graph starting 2-15m ahead, and feeds 30m NavigateToPose sub-goals.",
+        file: "src/perceptron_navigation/perceptron_navigation/gps_goal_node.py"
       }
     ],
     inputs: [
@@ -768,6 +800,7 @@ combined_grid = np.maximum(inflated_grid, dynamic_risk_grid)`
       { topic: "/clicked_point", type: "geometry_msgs/msg/PointStamped", source: "RViz Publish Point click-to-go" },
       { topic: "/carla/map/road_graph", type: "std_msgs/msg/String (JSON)", source: "carla_bridge lane polylines" },
       { topic: "/costmap/nav", type: "nav_msgs/msg/OccupancyGrid", source: "costmap_node (lethal + dynamic risk)" },
+      { topic: "/perception/road_costmap", type: "nav_msgs/msg/OccupancyGrid", source: "road_segmentation_node (vision road layer)" },
       { topic: "/perception/predicted_objects", type: "perceptron_msgs/msg/PredictedObjectArray", source: "trajectory_predictor_node" }
     ],
     outputs: [
@@ -777,14 +810,22 @@ combined_grid = np.maximum(inflated_grid, dynamic_risk_grid)`
       { topic: "/gps_goal/route", type: "nav_msgs/msg/Path", rate: "On goal", publisher: "gps_goal_node", target: "RViz road route display" },
       { topic: "/gps_goal/status", type: "std_msgs/msg/String (JSON)", rate: "10 Hz", publisher: "gps_goal_node", target: "Mission telemetry & CLI" }
     ],
-    codeSnippet: `# predictive_speed_limit_node.py: Corridor yielding calculation
-# Never reach a spot before a crossing person has cleared it, stop 1.5m short
-def limit_for_crossing(path_ego, obj_predicted_path, gap=1.5, decel=2.0):
-    t_obj_clear, s_corridor = compute_intersection(path_ego, obj_predicted_path)
-    if t_obj_clear is not None:
-        v_max = (s_corridor - gap) / t_obj_clear
-        return min(v_max, math.sqrt(2 * decel * max(0.0, s_corridor - gap)))
-    return 4.0 # unconstrained cruise`
+    codeSnippet: `# nav2_carla.yaml: MPPI Controller with Ackermann Model (800 rollouts)
+FollowPath:
+  plugin: "nav2_mppi_controller::MPPIController"
+  time_steps: 32
+  model_dt: 0.05
+  batch_size: 800
+  vx_max: 5.0
+  wz_max: 1.8
+  motion_model: "Ackermann"
+  AckermannConstraints:
+    min_turning_r: 2.2
+  critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic",
+            "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
+  CostCritic:
+    cost_weight: 3.8
+    collision_cost: 1000000.0`
   },
   {
     id: "stage-11",
@@ -813,7 +854,7 @@ def limit_for_crossing(path_ego, obj_predicted_path, gap=1.5, decel=2.0):
       {
         step: "11.3",
         title: "Safety Watchdog & E-Stop Interlock",
-        desc: "Commands full braking if /cmd_vel is older than 0.5s (watchdog timeout) or if /carla/estop is received. Slew limiter caps steering rate to 1.5 units/s and enforces max speed <= 4.0 m/s.",
+        desc: "Commands full braking if /cmd_vel is older than 0.5s (watchdog timeout) or if /carla/estop is received. Slew limiter caps steering rate to 1.5 units/s and enforces max speed <= 5.0 m/s.",
         frame: "Watchdog Loop",
         rate: "Continuous (20 Hz)"
       },
@@ -949,7 +990,10 @@ export const PIPELINE_TOPIC_CONNECTIONS = [
   { fromStage: 8, toStage: 9, topic: "/perception/predicted_objects", type: "perceptron_msgs/PredictedObjectArray", fromNode: "trajectory_predictor_node", toNode: "costmap_node" },
   { fromStage: 5, toStage: 9, topic: "/perception/points_obstacles and /perception/points_ground", type: "sensor_msgs/msg/PointCloud2", fromNode: "lidar_preprocessor_node", toNode: "costmap_node" },
   { fromStage: 2, toStage: 9, topic: "/odom", type: "nav_msgs/msg/Odometry", fromNode: "jetson_bridge_node / carla_bridge", toNode: "costmap_node" },
-  { fromStage: 9, toStage: 10, topic: "/costmap/nav", type: "nav_msgs/msg/OccupancyGrid", fromNode: "costmap_node", toNode: "planner_server / controller_server costmaps" },
+  { fromStage: 1, toStage: 9, topic: "/carla/camera/semantic", type: "sensor_msgs/msg/Image (mono8)", fromNode: "CARLA sensor actors", toNode: "road_segmentation_node" },
+  { fromStage: 9, toStage: 10, topic: "/costmap/nav", type: "nav_msgs/msg/OccupancyGrid", fromNode: "costmap_node", toNode: "planner_server / controller_server costmaps (perception_layer)" },
+  { fromStage: 9, toStage: 10, topic: "/perception/road_costmap (vision road layer)", type: "nav_msgs/msg/OccupancyGrid", fromNode: "road_segmentation_node", toNode: "planner_server / controller_server costmaps (road_layer)" },
+  { fromStage: 9, toStage: 12, topic: "/perception/road_cloud", type: "sensor_msgs/msg/PointCloud2", fromNode: "road_segmentation_node", toNode: "RViz road display" },
   { fromStage: 8, toStage: 10, topic: "/perception/predicted_objects", type: "perceptron_msgs/msg/PredictedObjectArray", fromNode: "trajectory_predictor_node", toNode: "predictive_speed_limit_node" },
   { fromStage: 2, toStage: 10, topic: "/carla/map/road_graph", type: "std_msgs/msg/String", fromNode: "carla_bridge", toNode: "gps_goal_node" },
   { fromStage: 4, toStage: 10, topic: "/map (global occupancy)", type: "nav_msgs/OccupancyGrid", fromNode: "async_slam_toolbox_node / map_server", toNode: "planner_server" },
